@@ -6,7 +6,7 @@ repositories {
 
 dependencies {
     // Regular GeckoView (smaller than geckoview-omni)
-    implementation "org.mozilla.geckoview:geckoview:143.0.0"
+    implementation "org.mozilla.geckoview:geckoview:143.0.20251003115653"
 }
 
 android {
