@@ -22,7 +22,7 @@
                      target-dir="src/com/example/cordova/geckoview" />
 
         <!-- GeckoView dependency; adjust version as needed -->
-        <framework src="org.mozilla.geckoview:geckoview-omni:147.0.0"
+        <framework src="org.mozilla.geckoview:geckoview-omni:143.0.20250929153833"
                    type="gradle" />
     </platform>
 </plugin>
