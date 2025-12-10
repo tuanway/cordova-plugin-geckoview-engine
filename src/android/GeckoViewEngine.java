@@ -6,6 +6,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.webkit.ValueCallback;
 
+import org.apache.cordova.CordovaBridge;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPreferences;
 import org.apache.cordova.CordovaResourceApi;
@@ -15,6 +16,7 @@ import org.apache.cordova.ICordovaCookieManager;
 import org.apache.cordova.NativeToJsMessageQueue;
 import org.apache.cordova.PluginManager;
 
+import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
@@ -35,6 +37,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected CordovaInterface cordova;
     protected CordovaPreferences preferences;
     protected Client cordovaClient;
+    protected CordovaResourceApi resourceApi;
+    protected PluginManager pluginManager;
+    protected NativeToJsMessageQueue nativeToJsMessageQueue;
+    protected CordovaBridge bridge;
+    protected boolean bridgeModeConfigured;
 
     // Gecko state
     protected FrameLayout containerView;
@@ -73,20 +80,35 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.parentWebView = parentWebView;
         this.cordova = cordova;
         this.cordovaClient = client;
+        this.resourceApi = resourceApi;
+        this.pluginManager = pluginManager;
+        this.nativeToJsMessageQueue = nativeToJsMessageQueue;
 
-        // Track location changes; modern GeckoView onLocationChange has 4 params.
-        geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
-            @Override
-            public void onLocationChange(GeckoSession session,
-                                         String url,
-                                         List<GeckoSession.PermissionDelegate.ContentPermission> perms,
-                                         Boolean hasUserGesture) {
-                currentUrl = url;
-                if (cordovaClient != null) {
-                    cordovaClient.onPageFinishedLoading(url);
-                }
-            }
-        });
+        if (nativeToJsMessageQueue != null && cordova != null && !bridgeModeConfigured) {
+            nativeToJsMessageQueue.addBridgeMode(
+                    new NativeToJsMessageQueue.OnlineEventsBridgeMode(
+                            new NativeToJsMessageQueue.OnlineEventsBridgeMode.OnlineEventsBridgeModeDelegate() {
+                                @Override
+                                public void setNetworkAvailable(boolean value) {
+                                    dispatchSyntheticOnlineEvent(value);
+                                }
+
+                                @Override
+                                public void runOnUiThread(Runnable r) {
+                                    GeckoViewEngine.this.cordova.getActivity().runOnUiThread(r);
+                                }
+                            }
+                    ));
+            nativeToJsMessageQueue.addBridgeMode(
+                    new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
+            bridgeModeConfigured = true;
+        }
+
+        if (pluginManager != null && nativeToJsMessageQueue != null) {
+            bridge = new CordovaBridge(pluginManager, nativeToJsMessageQueue);
+        }
+
+        rebindSessionDelegates();
     }
 
     @Override
@@ -203,10 +225,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
 
         geckoSession = new GeckoSession();
-        geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
         geckoSession.open(sRuntime);
 
         geckoView.setSession(geckoSession);
+
+        rebindSessionDelegates();
 
         containerView.addView(
                 geckoView,
@@ -222,14 +245,72 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
 
         geckoSession = new GeckoSession();
-        geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
         geckoSession.open(sRuntime);
         geckoView.setSession(geckoSession);
 
-        // Re-wire Cordova delegates if already initialized
-        if (cordovaClient != null) {
-            init(parentWebView, cordova, cordovaClient, null, null, null);
+        rebindSessionDelegates();
+    }
+
+    private void rebindSessionDelegates() {
+        if (geckoSession == null) {
+            return;
         }
+
+        geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
+
+        geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
+            @Override
+            public void onLocationChange(GeckoSession session,
+                                         String url,
+                                         List<GeckoSession.PermissionDelegate.ContentPermission> perms,
+                                         Boolean hasUserGesture) {
+                currentUrl = url;
+                if (cordovaClient != null) {
+                    cordovaClient.onPageFinishedLoading(url);
+                }
+            }
+        });
+
+        geckoSession.setPromptDelegate(new GeckoSession.PromptDelegate() {
+            @Override
+            public GeckoResult<GeckoSession.PromptDelegate.PromptResponse> onTextPrompt(
+                    GeckoSession session,
+                    GeckoSession.PromptDelegate.TextPrompt prompt) {
+                return handleCordovaPrompt(prompt);
+            }
+        });
+    }
+
+    private GeckoResult<GeckoSession.PromptDelegate.PromptResponse> handleCordovaPrompt(
+            GeckoSession.PromptDelegate.TextPrompt prompt) {
+
+        if (bridge == null) {
+            return null;
+        }
+
+        String origin = currentUrl != null ? currentUrl : "";
+        String defaultValue = prompt.defaultValue;
+        String message = prompt.message != null ? prompt.message : "";
+
+        String handled = bridge.promptOnJsPrompt(origin, message, defaultValue);
+        if (handled == null) {
+            return null;
+        }
+
+        return GeckoResult.fromValue(prompt.confirm(handled));
+    }
+
+    private void dispatchSyntheticOnlineEvent(boolean online) {
+        if (geckoSession == null) {
+            return;
+        }
+        String eventName = online ? "online" : "offline";
+        String js =
+                "(function(){var e=document.createEvent('Events');" +
+                "e.initEvent('" + eventName + "',false,false);" +
+                "window.dispatchEvent(e);" +
+                "})();";
+        evaluateJavascript(js, null);
     }
 
     // -------------------------------------------------------------------------
