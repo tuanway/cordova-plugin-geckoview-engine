@@ -27,9 +27,11 @@
         <!-- Network security config to permit localhost cleartext for the embedded server -->
         <resource-file src="src/android/geckoview_network_security_config.xml"
                        target="res/xml/geckoview_network_security_config.xml" />
-        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+        <edit-config file="AndroidManifest.xml"
+                     mode="merge"
+                     target="/manifest/application">
             <application android:networkSecurityConfig="@xml/geckoview_network_security_config" />
-        </config-file>
+        </edit-config>
 
     </platform>
 
