@@ -17,7 +17,7 @@ import org.apache.cordova.ICordovaCookieManager;
 import org.apache.cordova.NativeToJsMessageQueue;
 import org.apache.cordova.PluginManager;
 
-import org.mozilla.geckoview.GeckoRuntime;
+import org.mozilla.geckoview.Gec koRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 import org.mozilla.geckoview.GeckoResult;
@@ -252,7 +252,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
 
-        installCordovaExtension();
+        // installCordovaExtension();
     }
 
     private void recreateSession() {
@@ -266,7 +266,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView.setSession(geckoSession);
 
         // Re-wire extension for the new session
-        installCordovaExtension();
+        // installCordovaExtension();
 
         // Re-wire Cordova delegates if already initialized
         if (cordovaClient != null) {
