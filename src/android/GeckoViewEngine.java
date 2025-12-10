@@ -22,6 +22,7 @@ import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -44,11 +45,13 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected CordovaBridge bridge;
     protected boolean bridgeModeConfigured;
 
-    // Gecko state
+    // Gecko + server state
     protected EngineFrameLayout containerView;
     protected GeckoView geckoView;
     protected GeckoSession geckoSession;
     protected static GeckoRuntime sRuntime;
+    protected LocalHttpServer localServer;
+    protected String serverBaseUrl;
 
     // Track current URL for Cordova's getUrl()
     protected String currentUrl;
@@ -110,6 +113,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
 
         rebindSessionDelegates();
+
+        if (resourceApi != null) {
+            startLocalServer(resourceApi);
+        }
     }
 
     @Override
@@ -132,9 +139,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         if (clearNavigationStack) {
             clearHistory();
         }
-        currentUrl = url;
+        String rewritten = rewriteStartUrl(url);
+        currentUrl = rewritten;
         if (geckoSession != null) {
-            geckoSession.loadUri(url);
+            geckoSession.loadUri(rewritten);
         }
     }
 
@@ -192,6 +200,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public void destroy() {
+        if (localServer != null) {
+            localServer.stop();
+            localServer = null;
+            serverBaseUrl = null;
+        }
         if (geckoSession != null) {
             geckoSession.close();
             geckoSession = null;
@@ -312,6 +325,26 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 "window.dispatchEvent(e);" +
                 "})();";
         evaluateJavascript(js, null);
+    }
+
+    private void startLocalServer(CordovaResourceApi api) {
+        if (localServer != null) {
+            return;
+        }
+        try {
+            localServer = new LocalHttpServer(api, null);
+            localServer.start();
+            serverBaseUrl = localServer.getBaseUrl();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String rewriteStartUrl(String url) {
+        if (localServer == null || url == null) {
+            return url;
+        }
+        return localServer.rewriteUri(url);
     }
 
     // -------------------------------------------------------------------------
