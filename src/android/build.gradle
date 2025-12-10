@@ -5,7 +5,7 @@ repositories {
 }
 
 dependencies {
-    implementation "org.mozilla.geckoview:geckoview-omni:145.0.20251124145406" 
+    implementation "org.mozilla.geckoview:geckoview-omni:144.0.20251027123126/" 
 }
 
 android {
