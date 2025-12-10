@@ -19,6 +19,8 @@ import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
+import java.util.List;
+
 /**
  * Minimal, stable GeckoView-based Cordova WebView engine.
  *
@@ -72,10 +74,13 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.cordova = cordova;
         this.cordovaClient = client;
 
-        // Only track location changes — safe across GeckoView versions
+        // Track location changes; modern GeckoView onLocationChange has 4 params.
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
-            public void onLocationChange(GeckoSession session, String url) {
+            public void onLocationChange(GeckoSession session,
+                                         String url,
+                                         List<GeckoSession.PermissionDelegate.ContentPermission> perms,
+                                         Boolean hasUserGesture) {
                 currentUrl = url;
                 if (cordovaClient != null) {
                     cordovaClient.onPageFinishedLoading(url);
@@ -141,19 +146,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public boolean canGoBack() {
-        // We don't have access to native history; let Cordova attempt JS-level back.
-        // If you want to be conservative, you could return false and handle back yourself.
+        // We don't see native history state; let Cordova attempt JS-level back.
         return true;
     }
 
     @Override
     public boolean goBack() {
         // Use JS to navigate browser history instead of GeckoSession.canGoBack()/goBack()
-        // Basic safety: only go back if history length > 1
-        String js = "if (window.history && window.history.length > 1) { " +
-                    "window.history.back(); " +
+        String js = "if (window.history && window.history.length > 1) {" +
+                    "window.history.back();" +
                     "}";
-
         evaluateJavascript(js, null);
         return true;
     }
