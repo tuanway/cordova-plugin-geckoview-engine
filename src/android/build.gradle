@@ -29,8 +29,7 @@ android {
             // Turn on code + resource shrinking for smaller builds
             minifyEnabled true
             shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                    'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
         debug {
             minifyEnabled false
