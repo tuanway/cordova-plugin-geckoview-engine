@@ -98,6 +98,24 @@ class LocalHttpServer {
         if (url.startsWith("javascript:")) {
             return url;
         }
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            if ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)) {
+                String path = uri.getPath();
+                if (TextUtils.isEmpty(path) || "/".equals(path)) {
+                    path = "/index.html";
+                }
+                if (path.startsWith("/")) {
+                    path = path.substring(1);
+                }
+                String rewritten = baseUrl + "/" + path;
+                if (!TextUtils.isEmpty(uri.getEncodedQuery())) {
+                    rewritten += "?" + uri.getEncodedQuery();
+                }
+                return rewritten;
+            }
+        }
         if (url.startsWith("cdvfile://")) {
             return baseUrl + CDV_PREFIX + Uri.encode(url);
         }
