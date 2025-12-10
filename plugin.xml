@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin id="cordova-plugin-geckoview-engine"
+        version="1.0.0"
+        xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <name>Cordova GeckoView Engine</name>
+    <description>Replaces Cordova's default Android WebView with Mozilla GeckoView.</description>
+    <license>Apache-2.0</license>
+    <keywords>cordova,geckoview,firefox,webview,engine</keywords>
+
+    <engines>
+        <engine name="cordova-android" version=">=10.0.0" />
+    </engines>
+
+    <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
+        <clobbers target="window.GeckoViewEngine" />
+    </js-module>
+
+    <platform name="android">
+        <source-file src="src/android/GeckoViewEngine.java"
+                     target-dir="src/com/example/cordova/geckoview" />
+
+        <!-- GeckoView dependency; adjust version as needed -->
+        <framework src="org.mozilla.geckoview:geckoview-omni:147.0.0"
+                   type="gradle" />
+    </platform>
+</plugin>
