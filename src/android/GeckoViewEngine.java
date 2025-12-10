@@ -422,19 +422,68 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 "cdvfile".equalsIgnoreCase(scheme) ||
                 (TextUtils.isEmpty(scheme) && request.uri.startsWith("cdvfile://"));
         boolean isFileScheme = "file".equalsIgnoreCase(scheme);
-        if (!isCordovaScheme && !isFileScheme) {
+        boolean isLocalHttp = isLocalLoopback(uri);
+
+        if (!isCordovaScheme && !isFileScheme && !isLocalHttp) {
+            return null;
+        }
+
+        Uri resourceTarget = uri;
+        if (isLocalHttp) {
+            resourceTarget = resolveLocalHttpUri(uri);
+        }
+        if (resourceTarget == null) {
             return null;
         }
 
         final String originalUri = request.uri;
+        final Uri finalTarget = resourceTarget;
         GeckoResult<AllowOrDeny> decision = new GeckoResult<>();
         cordova.getThreadPool().execute(() -> {
-            boolean handled = streamLocalResourceToGecko(originalUri, uri);
+            boolean handled = streamLocalResourceToGecko(originalUri, finalTarget);
             decision.complete(handled
                     ? AllowOrDeny.DENY
                     : AllowOrDeny.ALLOW);
         });
         return decision;
+    }
+
+    private boolean isLocalLoopback(Uri uri) {
+        if (uri == null) {
+            return false;
+        }
+        String scheme = uri.getScheme();
+        if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+            return false;
+        }
+        String host = uri.getHost();
+        if (TextUtils.isEmpty(host)) {
+            return false;
+        }
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+    }
+
+    private Uri resolveLocalHttpUri(Uri original) {
+        if (original == null) {
+            return null;
+        }
+        if (localServer != null) {
+            Uri mapped = localServer.resolveAppUri(original.getPath());
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+        String path = original.getPath();
+        if (TextUtils.isEmpty(path) || "/".equals(path)) {
+            if (!TextUtils.isEmpty(startPageUri)) {
+                return Uri.parse(startPageUri);
+            }
+            path = "index.html";
+        }
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        return Uri.parse("file:///android_asset/www/" + path);
     }
 
     private boolean streamLocalResourceToGecko(String originalUri, Uri parsedUri) {
@@ -469,6 +518,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         final byte[] payload = data;
         final String mimeType = resolveMimeType(target, result.mimeType);
+        LOG.d(TAG, "Streaming " + payload.length + " bytes for " + originalUri + " from " + target);
         Activity activity = cordova.getActivity();
         Runnable loaderTask = () -> {
             if (geckoSession == null) {
