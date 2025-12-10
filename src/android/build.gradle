@@ -57,15 +57,8 @@ android {
 
     // Strip debug symbol libraries if present (can be large)
     packagingOptions {
-        def packagingDelegate = delegate
         excludes += ["**/*.so.debug"]
         excludes += ["**/libxul.so.debug"]
-        if (packagingDelegate.metaClass.respondsTo(packagingDelegate, "jniLibs", Closure)) {
-            jniLibs {
-                // Drop debug symbols from native libraries to shrink libxul
-                keepDebugSymbols = false
-            }
-        }
     }
 }
 
