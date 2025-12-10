@@ -24,11 +24,13 @@
         <source-file src="src/android/LocalHttpServer.java"
                      target-dir="src/com/cordova/geckoview" />
 
-        <!-- Allow cleartext localhost traffic so the embedded HTTP server can be reached -->
+        <!-- Network security config to permit localhost cleartext for the embedded server -->
+        <resource-file src="src/android/geckoview_network_security_config.xml"
+                       target="res/xml/geckoview_network_security_config.xml" />
         <edit-config file="AndroidManifest.xml"
                      mode="merge"
-                     target="/manifest/application">
-            <application android:usesCleartextTraffic="true" />
+                     target="/manifest/application/@android:networkSecurityConfig">
+            <application android:networkSecurityConfig="@xml/geckoview_network_security_config" />
         </edit-config>
 
     </platform>
