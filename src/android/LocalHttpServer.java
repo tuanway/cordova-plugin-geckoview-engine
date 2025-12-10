@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.text.TextUtils;
 
 import org.apache.cordova.CordovaResourceApi;
+import org.apache.cordova.LOG;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -26,6 +27,7 @@ import java.util.concurrent.Executors;
  */
 class LocalHttpServer {
 
+    private static final String TAG = "LocalHttpServer";
     private static final String LOCAL_HOST = "127.0.0.1";
     private static final String APP_PREFIX = "/_app_file_";
     private static final String CDV_PREFIX = "/_cdvfile_/";
@@ -171,6 +173,7 @@ class LocalHttpServer {
             if (requestLine == null || requestLine.isEmpty()) {
                 return;
             }
+            LOG.d(TAG, "Request line: " + requestLine);
             String[] parts = requestLine.split(" ");
             if (parts.length < 2) {
                 sendStatus(rawOut, "400 Bad Request", "Malformed request");
@@ -193,12 +196,14 @@ class LocalHttpServer {
             servePath(rawOut, path);
         } catch (IOException e) {
             // Ignore broken pipe etc.
+            LOG.e(TAG, "Error handling request", e);
         }
     }
 
     private void servePath(OutputStream out, String rawPath) throws IOException {
         Uri target = resolveTarget(rawPath);
         if (target == null) {
+            LOG.e(TAG, "No target resolved for " + rawPath);
             sendStatus(out, "404 Not Found", "Not Found");
             return;
         }
@@ -215,14 +220,17 @@ class LocalHttpServer {
                     Uri remappedFallback = resourceApi.remapUri(fallback);
                     result = resourceApi.openForRead(remappedFallback != null ? remappedFallback : fallback);
                 } catch (IOException ex) {
+                    LOG.e(TAG, "Fallback asset not found for " + rawPath, ex);
                     sendStatus(out, "404 Not Found", "Not Found");
                     return;
                 }
             } else {
+                LOG.e(TAG, "File not found for " + target, e);
                 sendStatus(out, "404 Not Found", "Not Found");
                 return;
             }
         } catch (IOException e) {
+            LOG.e(TAG, "Failed serving " + target, e);
             sendStatus(out, "500 Internal Server Error", "Error");
             return;
         }
@@ -267,6 +275,7 @@ class LocalHttpServer {
         if (path.startsWith(CDV_PREFIX)) {
             String encoded = path.substring(CDV_PREFIX.length());
             String decoded = Uri.decode(encoded);
+            LOG.d(TAG, "Decoding " + path + " -> " + decoded);
             return Uri.parse(decoded);
         }
         String relative;
@@ -289,6 +298,7 @@ class LocalHttpServer {
                 "Content-Type: text/plain\r\n" +
                 "Content-Length: " + body.length() + "\r\n" +
                 "Connection: close\r\n\r\n";
+        LOG.d(TAG, "Responding " + status + " for " + message);
         out.write(header.getBytes(StandardCharsets.US_ASCII));
         out.write(body.getBytes(StandardCharsets.UTF_8));
         out.flush();
