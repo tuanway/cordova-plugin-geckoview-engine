@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin id="cordova-plugin-geckoview-engine"
-        version="1.1.0"
+        version="1.2.0"
         xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android">
 
     <name>Cordova GeckoView Engine</name>
-    <description>Replaces Cordova's default Android WebView with Mozilla GeckoView.</description>
+    <description>Replaces Cordova's default Android WebView with Mozilla GeckoView (optimized size).</description>
 
     <platform name="android">
 
-        <!-- Inject custom Gradle file -->
+        <!-- Inject custom Gradle config: repos, GeckoView dep, ABI filters, Java 17, packaging -->
         <framework src="src/android/build.gradle"
                    custom="true"
                    type="gradleReference" />
