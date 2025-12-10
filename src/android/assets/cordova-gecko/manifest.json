@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "Cordova Gecko Bridge",
+  "version": "1.0",
+  "description": "Bridge Cordova JS to Android via GeckoView native messaging",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "cordova@example.com"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": [
+    "nativeMessaging",
+    "nativeMessagingFromContent",
+    "geckoViewAddons"
+  ]
+}
