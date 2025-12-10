@@ -182,10 +182,10 @@ class LocalHttpServer {
             String method = parts[0];
             String path = parts[1];
 
-            // Consume and ignore request headers for now.
+            // Consume and log request headers for debugging.
             String headerLine;
             while ((headerLine = reader.readLine()) != null && headerLine.length() > 0) {
-                // no-op
+                LOG.d(TAG, "Header: " + headerLine);
             }
 
             if (!"GET".equalsIgnoreCase(method)) {
@@ -201,6 +201,7 @@ class LocalHttpServer {
     }
 
     private void servePath(OutputStream out, String rawPath) throws IOException {
+        LOG.d(TAG, "Serving path " + rawPath);
         Uri target = resolveTarget(rawPath);
         if (target == null) {
             LOG.e(TAG, "No target resolved for " + rawPath);
