@@ -2,19 +2,36 @@
 
 apply plugin: 'com.android.application'
 
+// Allow overriding ABIs/locales via -PGECKO_ABIS="arm64-v8a,armeabi-v7a" etc.
+def geckoAbis = (project.findProperty("GECKO_ABIS") ?: "arm64-v8a")
+        .split(",")
+        .collect { it.trim() }
+        .findAll { it && !it.equalsIgnoreCase("all") }
+if (geckoAbis.isEmpty()) {
+    geckoAbis = ["arm64-v8a"]
+}
+def resPref = project.findProperty("GECKO_RES_CONFIGS") ?: "en"
+def keepAllLocales = resPref.equalsIgnoreCase("all")
+def geckoResConfigs = keepAllLocales ? [] : resPref
+        .split(",")
+        .collect { it.trim() }
+        .findAll { it }
+
 android {
     // Cordova usually defines these in Gradle properties; if your generated file
-    // uses cdvCompileSdkVersion etc., you can keep those instead of hardcoding.    
+    // uses cdvCompileSdkVersion etc., you can keep those instead of hardcoding.
 
-    defaultConfig {     
+    defaultConfig {
 
-        // Only ship a single ABI to reduce size (arm64 is what most modern devices use)
+        // Only ship the requested ABIs (defaults to arm64 for smallest Gecko build)
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters(*geckoAbis)
         }
 
-        // Only keep English resources; remove this if you need more locales
-        resConfigs "en"
+        // Strip unused locales from resources packaged into the APK/App Bundle
+        if (!geckoResConfigs.isEmpty()) {
+            resConfigs(*geckoResConfigs)
+        }
     }
 
     // Required for GeckoView 143+
@@ -27,9 +44,10 @@ android {
     buildTypes {
         release {
             // Turn on code + resource shrinking for smaller builds
-            minifyEnabled false
-            shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                          'proguard-geckoview.pro'
         }
         debug {
             minifyEnabled false
@@ -39,8 +57,15 @@ android {
 
     // Strip debug symbol libraries if present (can be large)
     packagingOptions {
+        def packagingDelegate = delegate
         excludes += ["**/*.so.debug"]
         excludes += ["**/libxul.so.debug"]
+        if (packagingDelegate.metaClass.respondsTo(packagingDelegate, "jniLibs", Closure)) {
+            jniLibs {
+                // Drop debug symbols from native libraries to shrink libxul
+                keepDebugSymbols = false
+            }
+        }
     }
 }
 
