@@ -2,12 +2,10 @@ package com.cordova.geckoview;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.webkit.ValueCallback;
 
-import org.apache.cordova.CordovaBridge;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPreferences;
 import org.apache.cordova.CordovaResourceApi;
@@ -20,35 +18,23 @@ import org.apache.cordova.PluginManager;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
-import org.mozilla.geckoview.GeckoResult;
-import org.mozilla.geckoview.WebExtension;
 
-import java.lang.reflect.Field;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
 /**
- * GeckoView-based Cordova WebView engine with a WebExtension-backed bridge.
+ * Minimal, stable GeckoView-based Cordova WebView engine.
  *
- * NOTE: This is experimental and may require adjustments depending on your
- * Cordova / GeckoView versions.
+ * - GeckoView 143.x compatible
+ * - Cordova-Android 10+ CordovaWebViewEngine interface compatible
+ * - JS-based back navigation (window.history.back())
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
-
-    private static final String TAG = "GeckoViewEngine";
-    private static final String NATIVE_APP_ID = "cordovaNative";
-    private static final boolean DISABLE_EXEC_CHAINING = resolveDisableExecChaining();
 
     // Cordova state
     protected CordovaWebView parentWebView;
     protected CordovaInterface cordova;
     protected CordovaPreferences preferences;
     protected Client cordovaClient;
-
-    protected PluginManager pluginManager;
-    protected NativeToJsMessageQueue jsMessageQueue;
-    protected CordovaBridge cordovaBridge;
 
     // Gecko state
     protected FrameLayout containerView;
@@ -61,8 +47,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     // No-op cookie manager (Cordova requires an instance)
     protected final ICordovaCookieManager cookieManager = new NoopCookieManager();
-
-    private WebExtension cordovaExtension;
 
     // Constructors (Cordova instantiates through reflection)
     public GeckoViewEngine(Context context, CordovaPreferences preferences) {
@@ -90,22 +74,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.cordova = cordova;
         this.cordovaClient = client;
 
-        // Bridge objects similar to SystemWebViewEngine
-        if (pluginManager != null) {
-            this.pluginManager = pluginManager;
-        } else {
-            this.pluginManager = new PluginManager(parentWebView, cordova, null);
-        }
-
-        if (nativeToJsMessageQueue != null) {
-            this.jsMessageQueue = nativeToJsMessageQueue;
-        } else {
-            this.jsMessageQueue = new NativeToJsMessageQueue();
-        }
-
-        this.cordovaBridge = new CordovaBridge(this.pluginManager, this.jsMessageQueue);
-
-        // Track location changes; signature matches modern GeckoView
+        // Track location changes; modern GeckoView onLocationChange has 4 params.
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
             public void onLocationChange(GeckoSession session,
@@ -171,7 +140,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         recreateSession();
     }
 
+    // -------------------------------------------------------------------------
     // JS-based back navigation
+    // -------------------------------------------------------------------------
+
     @Override
     public boolean canGoBack() {
         // We don't see native history state; let Cordova attempt JS-level back.
@@ -180,7 +152,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public boolean goBack() {
-        String js = "if (window.history && window.history.length > 1){" +
+        // Use JS to navigate browser history instead of GeckoSession.canGoBack()/goBack()
+        String js = "if (window.history && window.history.length > 1) {" +
                     "window.history.back();" +
                     "}";
         evaluateJavascript(js, null);
@@ -221,16 +194,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private static boolean resolveDisableExecChaining() {
-        try {
-            Field field = NativeToJsMessageQueue.class.getDeclaredField("DISABLE_EXEC_CHAINING");
-            field.setAccessible(true);
-            return field.getBoolean(null);
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
     private void createGeckoView(Context context) {
         containerView = new FrameLayout(context);
         geckoView = new GeckoView(context);
@@ -251,8 +214,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
-
-        // installCordovaExtension();
     }
 
     private void recreateSession() {
@@ -265,95 +226,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoSession.open(sRuntime);
         geckoView.setSession(geckoSession);
 
-        // Re-wire extension for the new session
-        // installCordovaExtension();
-
         // Re-wire Cordova delegates if already initialized
         if (cordovaClient != null) {
             init(parentWebView, cordova, cordovaClient, null, null, null);
         }
-    }
-
-    private void installCordovaExtension() {
-        if (sRuntime == null || geckoSession == null) {
-            return;
-        }
-
-        sRuntime.getWebExtensionController()
-                .ensureBuiltIn("resource://android/assets/cordova-gecko/", "cordova@example.com")
-                .accept(
-                        extension -> {
-                            Log.i(TAG, "Cordova WebExtension installed: " + extension);
-                            cordovaExtension = extension;
-
-                            WebExtension.MessageDelegate delegate = new WebExtension.MessageDelegate() {
-                                @Override
-                                public GeckoResult<Object> onMessage(String nativeApp,
-                                                                     Object message,
-                                                                     WebExtension.MessageSender sender) {
-                                    if (!NATIVE_APP_ID.equals(nativeApp)) {
-                                        return null;
-                                    }
-                                    return handleCordovaMessage(message);
-                                }
-                            };
-
-                            geckoSession.getWebExtensionController()
-                                    .setMessageDelegate(extension, delegate, NATIVE_APP_ID);
-                        },
-                        e -> Log.e(TAG, "Error installing Cordova WebExtension", e)
-                );
-    }
-
-    private GeckoResult<Object> handleCordovaMessage(Object message) {
-        if (!(message instanceof Map)) {
-            Log.w(TAG, "Unknown message from extension: " + message);
-            return GeckoResult.fromValue("");
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> map = (Map<String, Object>) message;
-        String type = (String) map.get("type");
-
-        if ("exec".equals(type)) {
-            String service = (String) map.get("service");
-            String action = (String) map.get("action");
-            String callbackId = (String) map.get("callbackId");
-            String argsJson = (String) map.get("arguments");
-
-            Log.d(TAG, "Cordova exec from Gecko: " + service + "." + action + " cb=" + callbackId);
-
-            jsMessageQueue.setPaused(true);
-            try {
-                CordovaResourceApi.jsThread = Thread.currentThread();
-                pluginManager.exec(service, action, callbackId, argsJson);
-
-                String ret = "";
-                if (!DISABLE_EXEC_CHAINING) {
-                    ret = jsMessageQueue.popAndEncode(false);
-                }
-                return GeckoResult.fromValue(ret);
-            } catch (Throwable e) {
-                Log.e(TAG, "Error in Cordova exec", e);
-                return GeckoResult.fromValue("");
-            } finally {
-                jsMessageQueue.setPaused(false);
-            }
-        } else if ("setBridgeMode".equals(type)) {
-            Number value = (Number) map.get("value");
-            if (value != null) {
-                jsMessageQueue.setBridgeMode(value.intValue());
-            }
-            return GeckoResult.fromValue(null);
-        } else if ("retrieveJsMessages".equals(type)) {
-            Boolean fromOnline = (Boolean) map.get("fromOnlineEvent");
-            boolean flag = fromOnline != null && fromOnline;
-            String encoded = jsMessageQueue.popAndEncode(flag);
-            return GeckoResult.fromValue(encoded);
-        }
-
-        Log.w(TAG, "Unhandled Cordova message type: " + type);
-        return GeckoResult.fromValue("");
     }
 
     // -------------------------------------------------------------------------

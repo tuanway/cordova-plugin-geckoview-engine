@@ -1,7 +1,10 @@
-// Simple helper so you can sanity-check from JS that GeckoView engine is present.
-var GeckoViewEngineInfo = {
-  engine: 'geckoview',
-  provider: 'Mozilla Gecko',
-  bridge: 'webextension-nativeMessaging'
+var GeckoViewEngine = {
+  getInfo: function () {
+    return Promise.resolve({
+      engine: 'geckoview',
+      provider: 'Mozilla Gecko',
+      embedded: true
+    });
+  }
 };
-module.exports = GeckoViewEngineInfo;
+module.exports = GeckoViewEngine;
