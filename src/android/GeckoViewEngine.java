@@ -1,6 +1,7 @@
 package com.cordova.geckoview;
 
 import android.content.Context;
+import android.net.Uri;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
@@ -343,6 +344,18 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     private String rewriteStartUrl(String url) {
         if (localServer == null || url == null) {
             return url;
+        }
+        if (resourceApi != null) {
+            try {
+                Uri original = Uri.parse(url);
+                Uri remapped = resourceApi.remapUri(original);
+                if (remapped != null && "file".equalsIgnoreCase(remapped.getScheme())) {
+                    String remappedString = remapped.toString();
+                    localServer.setDefaultAsset(remappedString);
+                    return localServer.rewriteFileUri(remappedString);
+                }
+            } catch (Exception ignored) {
+            }
         }
         return localServer.rewriteUri(url);
     }

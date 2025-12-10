@@ -38,6 +38,7 @@ class LocalHttpServer {
     private volatile boolean running;
     private String baseUrl;
     private final String appBase;
+    private String defaultRelativePath = "index.html";
 
     LocalHttpServer(CordovaResourceApi resourceApi, String appBasePath) {
         this.resourceApi = resourceApi;
@@ -130,6 +131,30 @@ class LocalHttpServer {
         return url;
     }
 
+    String rewriteFileUri(String fileUri) {
+        if (TextUtils.isEmpty(fileUri) || baseUrl == null) {
+            return fileUri;
+        }
+        if (fileUri.startsWith(appBase)) {
+            String rel = fileUri.substring(appBase.length());
+            return joinUrl(rel);
+        }
+        return fileUri;
+    }
+
+    void setDefaultAsset(String assetUri) {
+        if (TextUtils.isEmpty(assetUri)) {
+            return;
+        }
+        if (assetUri.startsWith(appBase)) {
+            String rel = assetUri.substring(appBase.length());
+            if (TextUtils.isEmpty(rel)) {
+                rel = "index.html";
+            }
+            defaultRelativePath = rel;
+        }
+    }
+
     private String joinUrl(String relative) {
         if (relative.startsWith("/")) {
             relative = relative.substring(1);
@@ -178,17 +203,33 @@ class LocalHttpServer {
             return;
         }
         CordovaResourceApi.OpenForReadResult result;
+        Uri servingUri = target;
         try {
             Uri remapped = resourceApi.remapUri(target);
             result = resourceApi.openForRead(remapped != null ? remapped : target);
         } catch (FileNotFoundException e) {
-            sendStatus(out, "404 Not Found", "Not Found");
+            if (!TextUtils.isEmpty(defaultRelativePath) && (TextUtils.isEmpty(target.getLastPathSegment()) || "index.html".equals(target.getLastPathSegment()))) {
+                Uri fallback = Uri.parse(appBase + defaultRelativePath);
+                servingUri = fallback;
+                try {
+                    Uri remappedFallback = resourceApi.remapUri(fallback);
+                    result = resourceApi.openForRead(remappedFallback != null ? remappedFallback : fallback);
+                } catch (IOException ex) {
+                    sendStatus(out, "404 Not Found", "Not Found");
+                    return;
+                }
+            } else {
+                sendStatus(out, "404 Not Found", "Not Found");
+                return;
+            }
+        } catch (IOException e) {
+            sendStatus(out, "500 Internal Server Error", "Error");
             return;
         }
 
         String mimeType = result.mimeType;
         if (TextUtils.isEmpty(mimeType)) {
-            mimeType = resourceApi.getMimeType(target);
+            mimeType = resourceApi.getMimeType(servingUri);
         }
         if (TextUtils.isEmpty(mimeType)) {
             mimeType = "application/octet-stream";
@@ -235,7 +276,7 @@ class LocalHttpServer {
             relative = path;
         }
         if (TextUtils.isEmpty(relative) || "/".equals(relative)) {
-            relative = "index.html";
+            relative = defaultRelativePath;
         } else if (relative.startsWith("/")) {
             relative = relative.substring(1);
         }
