@@ -1,7 +1,7 @@
 package com.cordova.geckoview;
 
 import android.content.Context;
-import android.content.res.AssetManager;
+import android.content.res.XmlResourceParser;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -27,7 +27,6 @@ import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -59,6 +58,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected static GeckoRuntime sRuntime;
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
+    protected String startPageUri;
 
     // Track current URL for Cordova's getUrl()
     protected String currentUrl;
@@ -342,9 +342,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             localServer = new LocalHttpServer(api, null);
             localServer.start();
             serverBaseUrl = localServer.getBaseUrl();
-            String defaultAsset = resolveStartAsset(containerView.getContext());
-            if (!TextUtils.isEmpty(defaultAsset)) {
-                localServer.setDefaultAsset(defaultAsset);
+            startPageUri = resolveStartAsset(containerView.getContext());
+            if (!TextUtils.isEmpty(startPageUri)) {
+                localServer.setDefaultAsset(startPageUri);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -355,6 +355,19 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         if (localServer == null || url == null) {
             return url;
         }
+        try {
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            if (!TextUtils.isEmpty(host) &&
+                ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host))) {
+                String path = uri.getPath();
+                if ((TextUtils.isEmpty(path) || "/".equals(path) || "/index.html".equals(path)) &&
+                        !TextUtils.isEmpty(startPageUri)) {
+                    return localServer.rewriteFileUri(startPageUri);
+                }
+            }
+        } catch (Exception ignored) { }
+
         if (resourceApi != null) {
             try {
                 Uri original = Uri.parse(url);
@@ -371,21 +384,28 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private String resolveStartAsset(Context context) {
-        AssetManager am = context.getAssets();
-        try (InputStream is = am.open("www/config.xml")) {
-            XmlPullParser parser = Xml.newPullParser();
-            parser.setInput(is, "UTF-8");
+        int id = context.getResources().getIdentifier("config", "xml", context.getPackageName());
+        if (id == 0) {
+            return null;
+        }
+        XmlResourceParser parser = context.getResources().getXml(id);
+        try {
             int event = parser.getEventType();
             while (event != XmlPullParser.END_DOCUMENT) {
                 if (event == XmlPullParser.START_TAG && "content".equals(parser.getName())) {
                     String src = parser.getAttributeValue(null, "src");
                     if (!TextUtils.isEmpty(src)) {
-                        return "file:///android_asset/www/" + src;
+                        if (!src.startsWith("file:///")) {
+                            src = "file:///android_asset/www/" + src;
+                        }
+                        return src;
                     }
                 }
                 event = parser.next();
             }
-        } catch (IOException | XmlPullParserException ignored) {
+        } catch (Exception ignored) {
+        } finally {
+            parser.close();
         }
         return null;
     }
