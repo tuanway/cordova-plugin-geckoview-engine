@@ -18,26 +18,19 @@ import org.apache.cordova.PluginManager;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
-import org.mozilla.geckoview.GeckoResult;
 
 /**
  * GeckoView-based Cordova WebView engine.
  *
- * Tested against:
- *   - GeckoView 143.x
- *   - Cordova-Android 10+ CordovaWebViewEngine interface
- *
- * NOTE:
- *  - Cookie manager is a no-op. If you need native-side cookie access,
- *    you’ll want to bridge via a WebExtension and JS (document.cookie).
- *  - JS evaluation uses "javascript:" URLs; GeckoView doesn't return
- *    results via evaluateJavascript like Android WebView.
+ * Simplified to avoid version-specific NavigationDelegate types:
+ * - No onLoadRequest() override (no blocking navigation)
+ * - Uses onLocationChange() to track URL and signal page finished.
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
 
     public static final String TAG = "GeckoViewEngine";
 
-    // Cordova-side state
+    // Cordova state
     protected CordovaWebView parentWebView;
     protected CordovaInterface cordova;
     protected CordovaPreferences preferences;
@@ -55,8 +48,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     // No-op cookie manager to satisfy Cordova interface
     protected final ICordovaCookieManager cookieManager = new NoopCookieManager();
 
-    // --- Constructors used by Cordova via reflection ---
-
+    // Constructors used by Cordova via reflection
     public GeckoViewEngine(Context context, CordovaPreferences preferences) {
         this.preferences = preferences;
         createGeckoView(context);
@@ -80,30 +72,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.cordova = cordova;
         this.cordovaClient = client;
 
-        // Navigation delegate: let Cordova inspect URLs and optionally block them.
+        // Only listen for location changes; don't try to intercept loads.
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
-            @Override
-            public GeckoResult<GeckoSession.NavigationDelegate.AllowOrDeny> onLoadRequest(
-                    GeckoSession session,
-                    GeckoSession.NavigationDelegate.LoadRequest request) {
-
-                String url = request.uri;
-                currentUrl = url;
-
-                if (cordovaClient != null) {
-                    boolean shouldBlock = cordovaClient.onNavigationAttempt(url);
-                    if (shouldBlock) {
-                        // Return a DENY result explicitly
-                        return GeckoResult.fromValue(
-                                GeckoSession.NavigationDelegate.AllowOrDeny.DENY
-                        );
-                    }
-                }
-
-                // null => default (ALLOW)
-                return null;
-            }
-
             @Override
             public void onLocationChange(GeckoSession session, String url) {
                 currentUrl = url;
@@ -187,7 +157,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     @Override
     public void setPaused(boolean value) {
         if (geckoSession == null) return;
-        // When paused, mark session as inactive
         geckoSession.setActive(!value);
     }
 
@@ -210,7 +179,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             geckoSession.loadUri(uri);
         }
         if (callback != null) {
-            // GeckoView doesn't provide a direct JS result here
+            // GeckoView doesn't provide a direct result like WebView.evaluateJavascript
             callback.onReceiveValue(null);
         }
     }
@@ -249,7 +218,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoSession.open(sRuntime);
         geckoView.setSession(geckoSession);
 
-        // Reattach Cordova navigation delegate if already initialized
+        // Re-attach delegate if we were already initialized
         if (cordovaClient != null) {
             init(parentWebView, cordova, cordovaClient, null, null, null);
         }
