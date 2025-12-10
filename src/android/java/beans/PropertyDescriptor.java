@@ -8,7 +8,7 @@ public class PropertyDescriptor extends FeatureDescriptor {
     private Method writeMethod;
 
     public PropertyDescriptor(String propertyName, Class<?> beanClass) {
-        this.name = propertyName;
+        this(propertyName, null, null);
     }
 
     public PropertyDescriptor(String propertyName, Method readMethod, Method writeMethod) {

@@ -16,7 +16,7 @@ def geckoResConfigs = keepAllLocales ? [] : resPref
         .split(",")
         .collect { it.trim() }
         .findAll { it }
-def enableMinify = (project.findProperty("GECKO_ENABLE_MINIFY") ?: "false")
+def enableMinify = (project.findProperty("GECKO_ENABLE_MINIFY") ?: "true")
         .toString()
         .toBoolean()
 
