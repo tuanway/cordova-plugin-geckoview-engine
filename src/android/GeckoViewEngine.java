@@ -1,8 +1,11 @@
 package com.cordova.geckoview;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.net.Uri;
+import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Xml;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -24,7 +27,10 @@ import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 /**
  * Minimal, stable GeckoView-based Cordova WebView engine.
@@ -336,6 +342,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             localServer = new LocalHttpServer(api, null);
             localServer.start();
             serverBaseUrl = localServer.getBaseUrl();
+            String defaultAsset = resolveStartAsset(containerView.getContext());
+            if (!TextUtils.isEmpty(defaultAsset)) {
+                localServer.setDefaultAsset(defaultAsset);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -358,6 +368,26 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             }
         }
         return localServer.rewriteUri(url);
+    }
+
+    private String resolveStartAsset(Context context) {
+        AssetManager am = context.getAssets();
+        try (InputStream is = am.open("www/config.xml")) {
+            XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(is, "UTF-8");
+            int event = parser.getEventType();
+            while (event != XmlPullParser.END_DOCUMENT) {
+                if (event == XmlPullParser.START_TAG && "content".equals(parser.getName())) {
+                    String src = parser.getAttributeValue(null, "src");
+                    if (!TextUtils.isEmpty(src)) {
+                        return "file:///android_asset/www/" + src;
+                    }
+                }
+                event = parser.next();
+            }
+        } catch (IOException | XmlPullParserException ignored) {
+        }
+        return null;
     }
 
     // -------------------------------------------------------------------------
