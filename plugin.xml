@@ -16,7 +16,7 @@
 
         <!-- Engine Java source -->
         <source-file src="src/android/GeckoViewEngine.java"
-                     target-dir="src/com/example/cordova/geckoview" />
+                     target-dir="src/com/cordova/geckoview" />
 
     </platform>
 
