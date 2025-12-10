@@ -443,9 +443,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return null;
         }
 
+        final String originalUri = request.uri;
+        final Uri finalResourceTarget = resourceTarget;
         GeckoResult<AllowOrDeny> decision = new GeckoResult<>();
         cordova.getThreadPool().execute(() -> {
-            boolean handled = streamLocalResourceToGecko(request.uri, resourceTarget);
+            boolean handled = streamLocalResourceToGecko(originalUri, finalResourceTarget);
             decision.complete(handled
                     ? AllowOrDeny.DENY
                     : AllowOrDeny.ALLOW);
