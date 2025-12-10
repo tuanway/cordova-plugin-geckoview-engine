@@ -20,6 +20,7 @@ import org.apache.cordova.CordovaWebViewEngine;
 import org.apache.cordova.ICordovaCookieManager;
 import org.apache.cordova.NativeToJsMessageQueue;
 import org.apache.cordova.PluginManager;
+import org.apache.cordova.LOG;
 
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
@@ -39,6 +40,7 @@ import org.xmlpull.v1.XmlPullParserException;
  * - JS-based back navigation (window.history.back())
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
+    private static final String TAG = "GeckoViewEngine";
 
     // Cordova state
     protected CordovaWebView parentWebView;
@@ -342,18 +344,23 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             localServer = new LocalHttpServer(api, null);
             localServer.start();
             serverBaseUrl = localServer.getBaseUrl();
+            LOG.d(TAG, "Local server started at " + serverBaseUrl);
             startPageUri = resolveStartAsset(containerView.getContext());
             if (!TextUtils.isEmpty(startPageUri)) {
+                LOG.d(TAG, "Resolved start page " + startPageUri);
                 localServer.setDefaultAsset(startPageUri);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.e(TAG, "Failed to start local server", e);
         }
     }
 
     private String rewriteStartUrl(String url) {
         if (localServer == null || url == null) {
             return url;
+        }
+        if (LOG.isLoggable(TAG, LOG.DEBUG)) {
+            LOG.d(TAG, "Rewriting URL " + url);
         }
         try {
             Uri uri = Uri.parse(url);
@@ -363,6 +370,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 String path = uri.getPath();
                 if ((TextUtils.isEmpty(path) || "/".equals(path) || "/index.html".equals(path)) &&
                         !TextUtils.isEmpty(startPageUri)) {
+                    LOG.d(TAG, "Routing localhost start path to " + startPageUri);
                     return localServer.rewriteFileUri(startPageUri);
                 }
             }
