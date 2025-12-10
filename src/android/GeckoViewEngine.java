@@ -1,5 +1,6 @@
 package com.cordova.geckoview;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
@@ -27,7 +28,9 @@ import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -283,6 +286,13 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
+            public GeckoResult<GeckoSession.AllowOrDeny> onLoadRequest(
+                    GeckoSession session,
+                    GeckoSession.NavigationDelegate.LoadRequest request) {
+                return interceptLocalLoad(request);
+            }
+
+            @Override
             public void onLocationChange(GeckoSession session,
                                          String url,
                                          List<GeckoSession.PermissionDelegate.ContentPermission> perms,
@@ -387,6 +397,119 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             }
         }
         return localServer.rewriteUri(url);
+    }
+
+    private GeckoResult<GeckoSession.AllowOrDeny> interceptLocalLoad(
+            GeckoSession.NavigationDelegate.LoadRequest request) {
+        if (request == null || resourceApi == null || cordova == null ||
+                TextUtils.isEmpty(request.uri)) {
+            return null;
+        }
+
+        Uri uri;
+        try {
+            uri = Uri.parse(request.uri);
+        } catch (Exception e) {
+            return null;
+        }
+        if (uri == null) {
+            return null;
+        }
+
+        String scheme = uri.getScheme();
+        boolean isCordovaScheme =
+                "cdvfile".equalsIgnoreCase(scheme) ||
+                (TextUtils.isEmpty(scheme) && request.uri.startsWith("cdvfile://"));
+        boolean isFileScheme = "file".equalsIgnoreCase(scheme);
+
+        if (!isCordovaScheme && !isFileScheme) {
+            return null;
+        }
+
+        GeckoResult<GeckoSession.AllowOrDeny> decision = new GeckoResult<>();
+        cordova.getThreadPool().execute(() -> {
+            boolean handled = streamLocalResourceToGecko(request.uri, uri);
+            decision.complete(handled
+                    ? GeckoSession.AllowOrDeny.DENY
+                    : GeckoSession.AllowOrDeny.ALLOW);
+        });
+        return decision;
+    }
+
+    private boolean streamLocalResourceToGecko(String originalUri, Uri parsedUri) {
+        if (geckoSession == null || resourceApi == null) {
+            return false;
+        }
+
+        Uri target = parsedUri;
+        try {
+            Uri remapped = resourceApi.remapUri(parsedUri);
+            if (remapped != null) {
+                target = remapped;
+            }
+        } catch (Exception ignored) {
+        }
+
+        CordovaResourceApi.OpenForReadResult result;
+        try {
+            result = resourceApi.openForRead(target);
+        } catch (IOException e) {
+            LOG.e(TAG, "Failed to open local resource " + originalUri, e);
+            return false;
+        }
+
+        byte[] data;
+        try (InputStream input = result.inputStream) {
+            data = drainStream(input);
+        } catch (IOException e) {
+            LOG.e(TAG, "Failed to read local resource " + originalUri, e);
+            return false;
+        }
+
+        final byte[] payload = data;
+        final String mimeType = resolveMimeType(target, result.mimeType);
+        Activity activity = cordova.getActivity();
+        Runnable loaderTask = () -> {
+            if (geckoSession == null) {
+                return;
+            }
+            GeckoSession.Loader loader = new GeckoSession.Loader()
+                    .uri(originalUri)
+                    .data(payload, mimeType);
+            geckoSession.load(loader);
+        };
+        if (activity != null) {
+            activity.runOnUiThread(loaderTask);
+        } else {
+            loaderTask.run();
+        }
+        return true;
+    }
+
+    private byte[] drainStream(InputStream input) throws IOException {
+        if (input == null) {
+            return new byte[0];
+        }
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[16 * 1024];
+        int read;
+        while ((read = input.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
+    private String resolveMimeType(Uri source, String provided) {
+        if (!TextUtils.isEmpty(provided)) {
+            return provided;
+        }
+        if (resourceApi != null && source != null) {
+            String guessed = resourceApi.getMimeType(source);
+            if (!TextUtils.isEmpty(guessed)) {
+                return guessed;
+            }
+        }
+        return "application/octet-stream";
     }
 
     private String resolveStartAsset(Context context) {
