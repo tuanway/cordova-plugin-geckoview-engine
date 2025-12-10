@@ -22,18 +22,6 @@
         <source-file src="src/android/GeckoViewEngine.java"
                      target-dir="src/com/cordova/geckoview" />
 
-        <!-- Minimal java.beans stubs for GeckoView + SnakeYAML -->
-        <source-file src="src/android/java/beans/BeanInfo.java"
-                     target-dir="src/java/beans" />
-        <source-file src="src/android/java/beans/FeatureDescriptor.java"
-                     target-dir="src/java/beans" />
-        <source-file src="src/android/java/beans/IntrospectionException.java"
-                     target-dir="src/java/beans" />
-        <source-file src="src/android/java/beans/Introspector.java"
-                     target-dir="src/java/beans" />
-        <source-file src="src/android/java/beans/PropertyDescriptor.java"
-                     target-dir="src/java/beans" />
-
     </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
