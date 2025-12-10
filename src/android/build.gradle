@@ -16,6 +16,9 @@ def geckoResConfigs = keepAllLocales ? [] : resPref
         .split(",")
         .collect { it.trim() }
         .findAll { it }
+def enableMinify = (project.findProperty("GECKO_ENABLE_MINIFY") ?: "false")
+        .toString()
+        .toBoolean()
 
 android {
     // Cordova usually defines these in Gradle properties; if your generated file
@@ -43,11 +46,16 @@ android {
     // Release vs debug builds
     buildTypes {
         release {
-            // Turn on code + resource shrinking for smaller builds
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                          'proguard-geckoview.pro'
+            // Optional code/resource shrinking. Disabled by default since SnakeYAML pulls in java.beans.
+            if (enableMinify) {
+                minifyEnabled true
+                shrinkResources true
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                              'proguard-geckoview.pro'
+            } else {
+                minifyEnabled false
+                shrinkResources false
+            }
         }
         debug {
             minifyEnabled false
