@@ -1,4 +1,4 @@
-package com.example.cordova.geckoview;
+package com.cordova.geckoview;
 
 import android.content.Context;
 import android.util.AttributeSet;
