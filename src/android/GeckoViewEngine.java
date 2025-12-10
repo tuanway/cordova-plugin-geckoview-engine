@@ -22,12 +22,9 @@ import org.mozilla.geckoview.GeckoView;
 /**
  * Minimal, stable GeckoView-based Cordova WebView engine.
  *
- * Fully compatible with:
- *   - GeckoView 143.x
- *   - Cordova-Android 10+ WebViewEngine interface
- *
- * This implementation intentionally avoids APIs not exposed by GeckoView 143,
- * such as history navigation, load interception with AllowOrDeny, etc.
+ * - GeckoView 143.x compatible
+ * - Cordova-Android 10+ CordovaWebViewEngine interface compatible
+ * - JS-based back navigation (window.history.back())
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
 
@@ -127,7 +124,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public void clearCache() {
-        // GeckoSession doesn't expose deep cache APIs, so we approximate
+        // Approximate cache clearing by forcing a cache-bypass reload
         if (geckoSession != null && currentUrl != null) {
             geckoSession.reload(GeckoSession.LOAD_FLAGS_BYPASS_CACHE);
         }
@@ -138,15 +135,27 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         recreateSession();
     }
 
-    // NO NATIVE HISTORY AVAILABLE → Stub implementations
+    // -------------------------------------------------------------------------
+    // JS-based back navigation
+    // -------------------------------------------------------------------------
+
     @Override
     public boolean canGoBack() {
-        return false; // Cordova will treat this as "cannot go back"
+        // We don't have access to native history; let Cordova attempt JS-level back.
+        // If you want to be conservative, you could return false and handle back yourself.
+        return true;
     }
 
     @Override
     public boolean goBack() {
-        return false; // No native back navigation available
+        // Use JS to navigate browser history instead of GeckoSession.canGoBack()/goBack()
+        // Basic safety: only go back if history length > 1
+        String js = "if (window.history && window.history.length > 1) { " +
+                    "window.history.back(); " +
+                    "}";
+
+        evaluateJavascript(js, null);
+        return true;
     }
 
     @Override
@@ -160,9 +169,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     public void destroy() {
         if (geckoSession != null) {
             geckoSession.close();
+            geckoSession = null;
         }
         if (geckoView != null && containerView != null) {
             containerView.removeView(geckoView);
+            geckoView = null;
         }
     }
 
@@ -172,7 +183,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             geckoSession.loadUri("javascript:" + js);
         }
         if (callback != null) {
-            callback.onReceiveValue(null); // GeckoView doesn't return JS results
+            // GeckoView doesn't return JS results through this API
+            callback.onReceiveValue(null);
         }
     }
 
