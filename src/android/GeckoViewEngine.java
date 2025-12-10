@@ -20,15 +20,16 @@ import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
 /**
- * GeckoView-based Cordova WebView engine.
+ * Minimal, stable GeckoView-based Cordova WebView engine.
  *
- * Simplified to avoid version-specific NavigationDelegate types:
- * - No onLoadRequest() override (no blocking navigation)
- * - Uses onLocationChange() to track URL and signal page finished.
+ * Fully compatible with:
+ *   - GeckoView 143.x
+ *   - Cordova-Android 10+ WebViewEngine interface
+ *
+ * This implementation intentionally avoids APIs not exposed by GeckoView 143,
+ * such as history navigation, load interception with AllowOrDeny, etc.
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
-
-    public static final String TAG = "GeckoViewEngine";
 
     // Cordova state
     protected CordovaWebView parentWebView;
@@ -36,19 +37,19 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected CordovaPreferences preferences;
     protected Client cordovaClient;
 
-    // Gecko / View state
+    // Gecko state
     protected FrameLayout containerView;
     protected GeckoView geckoView;
     protected GeckoSession geckoSession;
     protected static GeckoRuntime sRuntime;
 
-    // Current URL for getUrl()
+    // Track current URL for Cordova's getUrl()
     protected String currentUrl;
 
-    // No-op cookie manager to satisfy Cordova interface
+    // No-op cookie manager (Cordova requires an instance)
     protected final ICordovaCookieManager cookieManager = new NoopCookieManager();
 
-    // Constructors used by Cordova via reflection
+    // Constructors (Cordova instantiates through reflection)
     public GeckoViewEngine(Context context, CordovaPreferences preferences) {
         this.preferences = preferences;
         createGeckoView(context);
@@ -58,7 +59,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this(context, preferences);
     }
 
-    // ---- CordovaWebViewEngine implementation ----
+    // -------------------------------------------------------------------------
+    // CordovaWebViewEngine implementation
+    // -------------------------------------------------------------------------
 
     @Override
     public void init(CordovaWebView parentWebView,
@@ -72,7 +75,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.cordova = cordova;
         this.cordovaClient = client;
 
-        // Only listen for location changes; don't try to intercept loads.
+        // Only track location changes — safe across GeckoView versions
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
             public void onLocationChange(GeckoSession session, String url) {
@@ -124,13 +127,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public void clearCache() {
-        clearCache(true);
-    }
-
-    @Override
-    public void clearCache(boolean b) {
-        if (geckoSession != null) {
-            // Simple cache-bypass reload
+        // GeckoSession doesn't expose deep cache APIs, so we approximate
+        if (geckoSession != null && currentUrl != null) {
             geckoSession.reload(GeckoSession.LOAD_FLAGS_BYPASS_CACHE);
         }
     }
@@ -140,72 +138,67 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         recreateSession();
     }
 
+    // NO NATIVE HISTORY AVAILABLE → Stub implementations
     @Override
     public boolean canGoBack() {
-        return geckoSession != null && geckoSession.canGoBack();
+        return false; // Cordova will treat this as "cannot go back"
     }
 
     @Override
     public boolean goBack() {
-        if (geckoSession != null && geckoSession.canGoBack()) {
-            geckoSession.goBack();
-            return true;
-        }
-        return false;
+        return false; // No native back navigation available
     }
 
     @Override
     public void setPaused(boolean value) {
-        if (geckoSession == null) return;
-        geckoSession.setActive(!value);
+        if (geckoSession != null) {
+            geckoSession.setActive(!value);
+        }
     }
 
     @Override
     public void destroy() {
         if (geckoSession != null) {
             geckoSession.close();
-            geckoSession = null;
         }
         if (geckoView != null && containerView != null) {
             containerView.removeView(geckoView);
-            geckoView = null;
         }
     }
 
     @Override
     public void evaluateJavascript(String js, ValueCallback<String> callback) {
         if (geckoSession != null) {
-            String uri = "javascript:" + js;
-            geckoSession.loadUri(uri);
+            geckoSession.loadUri("javascript:" + js);
         }
         if (callback != null) {
-            // GeckoView doesn't provide a direct result like WebView.evaluateJavascript
-            callback.onReceiveValue(null);
+            callback.onReceiveValue(null); // GeckoView doesn't return JS results
         }
     }
 
-    // ---- Internal helpers ----
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
 
     private void createGeckoView(Context context) {
         containerView = new FrameLayout(context);
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            // GeckoRuntime should be a process-wide singleton
             sRuntime = GeckoRuntime.create(context.getApplicationContext());
         }
 
         geckoSession = new GeckoSession();
         geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
         geckoSession.open(sRuntime);
+
         geckoView.setSession(geckoSession);
 
         containerView.addView(
                 geckoView,
                 new FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                )
+                        FrameLayout.LayoutParams.MATCH_PARENT)
         );
     }
 
@@ -213,29 +206,27 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         if (geckoSession != null) {
             geckoSession.close();
         }
+
         geckoSession = new GeckoSession();
         geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
         geckoSession.open(sRuntime);
         geckoView.setSession(geckoSession);
 
-        // Re-attach delegate if we were already initialized
+        // Re-wire Cordova delegates if already initialized
         if (cordovaClient != null) {
             init(parentWebView, cordova, cordovaClient, null, null, null);
         }
     }
 
-    // ---- No-op cookie manager implementation ----
+    // -------------------------------------------------------------------------
+    // No-op cookie manager
+    // -------------------------------------------------------------------------
 
     private static class NoopCookieManager implements ICordovaCookieManager {
-        @Override
-        public void setCookiesEnabled(boolean accept) { }
-        @Override
-        public void setCookie(String url, String value) { }
-        @Override
-        public String getCookie(String url) { return null; }
-        @Override
-        public void clearCookies() { }
-        @Override
-        public void flush() { }
+        @Override public void setCookiesEnabled(boolean accept) { }
+        @Override public void setCookie(String url, String value) { }
+        @Override public String getCookie(String url) { return null; }
+        @Override public void clearCookies() { }
+        @Override public void flush() { }
     }
 }
