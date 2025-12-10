@@ -2,6 +2,7 @@ package com.cordova.geckoview;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.webkit.ValueCallback;
@@ -44,7 +45,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected boolean bridgeModeConfigured;
 
     // Gecko state
-    protected FrameLayout containerView;
+    protected EngineFrameLayout containerView;
     protected GeckoView geckoView;
     protected GeckoSession geckoSession;
     protected static GeckoRuntime sRuntime;
@@ -217,7 +218,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     // -------------------------------------------------------------------------
 
     private void createGeckoView(Context context) {
-        containerView = new FrameLayout(context);
+        containerView = new EngineFrameLayout(context);
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
@@ -316,6 +317,29 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     // -------------------------------------------------------------------------
     // No-op cookie manager
     // -------------------------------------------------------------------------
+
+    private class EngineFrameLayout extends FrameLayout implements CordovaWebViewEngine.EngineView {
+
+        EngineFrameLayout(Context context) {
+            super(context);
+        }
+
+        @Override
+        public CordovaWebView getCordovaWebView() {
+            return parentWebView;
+        }
+
+        @Override
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            if (cordovaClient != null) {
+                Boolean handled = cordovaClient.onDispatchKeyEvent(event);
+                if (handled != null) {
+                    return handled.booleanValue();
+                }
+            }
+            return super.dispatchKeyEvent(event);
+        }
+    }
 
     private static class NoopCookieManager implements ICordovaCookieManager {
         @Override public void setCookiesEnabled(boolean accept) { }
