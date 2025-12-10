@@ -64,6 +64,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected static GeckoRuntime sRuntime;
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
+    protected Uri serverBaseUri;
     protected String startPageUri;
 
     // Track current URL for Cordova's getUrl()
@@ -217,6 +218,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             localServer.stop();
             localServer = null;
             serverBaseUrl = null;
+            serverBaseUri = null;
         }
         if (geckoSession != null) {
             geckoSession.close();
@@ -355,6 +357,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             localServer = new LocalHttpServer(api, null);
             localServer.start();
             serverBaseUrl = localServer.getBaseUrl();
+            try {
+                serverBaseUri = Uri.parse(serverBaseUrl);
+            } catch (Exception ignored) {
+                serverBaseUri = null;
+            }
             LOG.d(TAG, "Local server started at " + serverBaseUrl);
             startPageUri = resolveStartAsset(containerView.getContext());
             if (!TextUtils.isEmpty(startPageUri)) {
@@ -422,19 +429,43 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 "cdvfile".equalsIgnoreCase(scheme) ||
                 (TextUtils.isEmpty(scheme) && request.uri.startsWith("cdvfile://"));
         boolean isFileScheme = "file".equalsIgnoreCase(scheme);
+        boolean isLocalHttp = isLocalServerUri(uri);
 
-        if (!isCordovaScheme && !isFileScheme) {
+        if (!isCordovaScheme && !isFileScheme && !isLocalHttp) {
+            return null;
+        }
+
+        Uri resourceTarget = uri;
+        if (isLocalHttp && localServer != null) {
+            resourceTarget = localServer.resolveAppUri(uri.getPath());
+        }
+        if (resourceTarget == null) {
             return null;
         }
 
         GeckoResult<AllowOrDeny> decision = new GeckoResult<>();
         cordova.getThreadPool().execute(() -> {
-            boolean handled = streamLocalResourceToGecko(request.uri, uri);
+            boolean handled = streamLocalResourceToGecko(request.uri, resourceTarget);
             decision.complete(handled
                     ? AllowOrDeny.DENY
                     : AllowOrDeny.ALLOW);
         });
         return decision;
+    }
+
+    private boolean isLocalServerUri(Uri uri) {
+        if (uri == null || serverBaseUri == null) {
+            return false;
+        }
+        int port = uri.getPort();
+        int serverPort = serverBaseUri.getPort();
+        if (serverPort == -1) {
+            serverPort = 80;
+        }
+        if (port == -1) {
+            port = 80;
+        }
+        return TextUtils.equals(serverBaseUri.getHost(), uri.getHost()) && serverPort == port;
     }
 
     private boolean streamLocalResourceToGecko(String originalUri, Uri parsedUri) {

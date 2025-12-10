@@ -264,6 +264,10 @@ class LocalHttpServer {
         out.flush();
     }
 
+    Uri resolveAppUri(String path) {
+        return resolveTarget(path);
+    }
+
     private Uri resolveTarget(String path) {
         if (TextUtils.isEmpty(path)) {
             path = "/";

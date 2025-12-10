@@ -24,6 +24,13 @@
         <source-file src="src/android/LocalHttpServer.java"
                      target-dir="src/com/cordova/geckoview" />
 
+        <!-- Allow cleartext localhost traffic so the embedded HTTP server can be reached -->
+        <edit-config file="AndroidManifest.xml"
+                     mode="merge"
+                     target="/manifest/application">
+            <application android:usesCleartextTraffic="true" />
+        </edit-config>
+
     </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
