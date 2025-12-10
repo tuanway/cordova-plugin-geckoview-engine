@@ -24,15 +24,6 @@
         <source-file src="src/android/LocalHttpServer.java"
                      target-dir="src/com/cordova/geckoview" />
 
-        <!-- Network security config to permit localhost cleartext for the embedded server -->
-        <resource-file src="src/android/geckoview_network_security_config.xml"
-                       target="res/xml/geckoview_network_security_config.xml" />
-        <edit-config file="AndroidManifest.xml"
-                     mode="merge"
-                     target="/manifest/application">
-            <application android:networkSecurityConfig="@xml/geckoview_network_security_config" />
-        </edit-config>
-
     </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
