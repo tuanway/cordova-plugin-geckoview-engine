@@ -18,6 +18,10 @@
     </js-module>
 
     <platform name="android">
+         <!-- Add Mozilla Maven Repo -->
+        <framework src="https://maven.mozilla.org/maven2/"
+               type="mavenRepository" />
+            
         <source-file src="src/android/GeckoViewEngine.java"
                      target-dir="src/com/example/cordova/geckoview" />
 
