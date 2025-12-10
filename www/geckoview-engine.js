@@ -7,5 +7,4 @@ var GeckoViewEngine = {
     });
   }
 };
-
 module.exports = GeckoViewEngine;

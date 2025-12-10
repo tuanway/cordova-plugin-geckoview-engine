@@ -1,0 +1,16 @@
+repositories {
+    google()
+    mavenCentral()
+    maven { url "https://maven.mozilla.org/maven2/" }
+}
+
+dependencies {
+    implementation "org.mozilla.geckoview:geckoview-omni:146.0.20251201213807" 
+}
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

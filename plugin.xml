@@ -1,32 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin id="cordova-plugin-geckoview-engine"
-        version="1.0.0"
+        version="1.1.0"
         xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android">
 
     <name>Cordova GeckoView Engine</name>
     <description>Replaces Cordova's default Android WebView with Mozilla GeckoView.</description>
-    <license>Apache-2.0</license>
-    <keywords>cordova,geckoview,firefox,webview,engine</keywords>
 
-    <engines>
-        <engine name="cordova-android" version=">=10.0.0" />
-    </engines>
+    <platform name="android">
+
+        <!-- Inject custom Gradle file -->
+        <framework src="src/android/build.gradle"
+                   custom="true"
+                   type="gradleReference" />
+
+        <!-- Engine Java source -->
+        <source-file src="src/android/GeckoViewEngine.java"
+                     target-dir="src/com/example/cordova/geckoview" />
+
+    </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
         <clobbers target="window.GeckoViewEngine" />
     </js-module>
 
-    <platform name="android">
-         <!-- Add Mozilla Maven Repo -->
-        <framework src="https://maven.mozilla.org/maven2/"
-               type="mavenRepository" />
-            
-        <source-file src="src/android/GeckoViewEngine.java"
-                     target-dir="src/com/example/cordova/geckoview" />
-
-        <!-- GeckoView dependency; adjust version as needed -->
-        <framework src="org.mozilla.geckoview:geckoview-omni:146.0.20251201213807"
-                   type="gradle" />
-    </platform>
 </plugin>
