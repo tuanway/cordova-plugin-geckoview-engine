@@ -23,6 +23,7 @@ import org.mozilla.geckoview.GeckoView;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.WebExtension;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     private static final String TAG = "GeckoViewEngine";
     private static final String NATIVE_APP_ID = "cordovaNative";
+    private static final boolean DISABLE_EXEC_CHAINING = resolveDisableExecChaining();
 
     // Cordova state
     protected CordovaWebView parentWebView;
@@ -219,6 +221,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     // Internal helpers
     // -------------------------------------------------------------------------
 
+    private static boolean resolveDisableExecChaining() {
+        try {
+            Field field = NativeToJsMessageQueue.class.getDeclaredField("DISABLE_EXEC_CHAINING");
+            field.setAccessible(true);
+            return field.getBoolean(null);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     private void createGeckoView(Context context) {
         containerView = new FrameLayout(context);
         geckoView = new GeckoView(context);
@@ -317,7 +329,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 pluginManager.exec(service, action, callbackId, argsJson);
 
                 String ret = "";
-                if (!NativeToJsMessageQueue.DISABLE_EXEC_CHAINING) {
+                if (!DISABLE_EXEC_CHAINING) {
                     ret = jsMessageQueue.popAndEncode(false);
                 }
                 return GeckoResult.fromValue(ret);
