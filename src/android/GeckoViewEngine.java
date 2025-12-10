@@ -359,9 +359,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         if (localServer == null || url == null) {
             return url;
         }
-        if (LOG.isLoggable(TAG, LOG.DEBUG)) {
-            LOG.d(TAG, "Rewriting URL " + url);
-        }
+        LOG.d(TAG, "Rewriting URL " + url);
         try {
             Uri uri = Uri.parse(url);
             String host = uri.getHost();
