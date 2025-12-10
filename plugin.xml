@@ -14,6 +14,10 @@
                    custom="true"
                    type="gradleReference" />
 
+        <!-- R8/ProGuard rules for GeckoView + Cordova -->
+        <resource-file src="src/android/proguard-geckoview.pro"
+                       target="app/proguard-geckoview.pro" />
+
         <!-- Engine Java source -->
         <source-file src="src/android/GeckoViewEngine.java"
                      target-dir="src/com/cordova/geckoview" />
