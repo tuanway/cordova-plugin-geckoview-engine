@@ -23,6 +23,7 @@ import org.apache.cordova.NativeToJsMessageQueue;
 import org.apache.cordova.PluginManager;
 import org.apache.cordova.LOG;
 
+import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
@@ -286,7 +287,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
-            public GeckoResult<GeckoSession.AllowOrDeny> onLoadRequest(
+            public GeckoResult<AllowOrDeny> onLoadRequest(
                     GeckoSession session,
                     GeckoSession.NavigationDelegate.LoadRequest request) {
                 return interceptLocalLoad(request);
@@ -399,7 +400,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         return localServer.rewriteUri(url);
     }
 
-    private GeckoResult<GeckoSession.AllowOrDeny> interceptLocalLoad(
+    private GeckoResult<AllowOrDeny> interceptLocalLoad(
             GeckoSession.NavigationDelegate.LoadRequest request) {
         if (request == null || resourceApi == null || cordova == null ||
                 TextUtils.isEmpty(request.uri)) {
@@ -426,12 +427,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return null;
         }
 
-        GeckoResult<GeckoSession.AllowOrDeny> decision = new GeckoResult<>();
+        GeckoResult<AllowOrDeny> decision = new GeckoResult<>();
         cordova.getThreadPool().execute(() -> {
             boolean handled = streamLocalResourceToGecko(request.uri, uri);
             decision.complete(handled
-                    ? GeckoSession.AllowOrDeny.DENY
-                    : GeckoSession.AllowOrDeny.ALLOW);
+                    ? AllowOrDeny.DENY
+                    : AllowOrDeny.ALLOW);
         });
         return decision;
     }
