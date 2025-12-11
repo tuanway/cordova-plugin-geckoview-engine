@@ -1,6 +1,7 @@
 package com.cordova.geckoview;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
@@ -329,20 +330,19 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     private class EnginePromptDelegate implements GeckoSession.PromptDelegate {
         @Override
-        public GeckoResult<PromptResponse> onAlert(
+        public GeckoResult<PromptResponse> onAlertPrompt(
                 GeckoSession session,
                 AlertPrompt prompt) {
             Activity activity = cordova != null ? cordova.getActivity() : null;
             if (activity == null) {
-                prompt.dismiss();
                 return GeckoResult.fromValue(prompt.dismiss());
             }
             activity.runOnUiThread(() -> {
-                new androidx.appcompat.app.AlertDialog.Builder(activity)
+                new AlertDialog.Builder(activity)
                         .setMessage(prompt.message != null ? prompt.message : "")
                         .setPositiveButton(android.R.string.ok,
                                 (dialog, which) -> prompt.dismiss())
-                        .setCancelable(true)
+                        .setOnCancelListener(dialog -> prompt.dismiss())
                         .show();
             });
             return GeckoResult.fromValue(prompt.dismiss());
