@@ -1,7 +1,6 @@
 package com.cordova.geckoview;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
@@ -338,14 +337,15 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 return GeckoResult.fromValue(prompt.dismiss());
             }
             activity.runOnUiThread(() -> {
-                new AlertDialog.Builder(activity)
-                        .setMessage(prompt.message != null ? prompt.message : "")
-                        .setPositiveButton(android.R.string.ok,
-                                (dialog, which) -> prompt.dismiss())
-                        .setOnCancelListener(dialog -> prompt.dismiss())
-                        .show();
+                androidx.appcompat.app.AlertDialog.Builder builder =
+                        new androidx.appcompat.app.AlertDialog.Builder(activity);
+                builder.setMessage(prompt.message != null ? prompt.message : "");
+                builder.setPositiveButton(android.R.string.ok,
+                        (dialog, which) -> prompt.confirm());
+                builder.setOnCancelListener(dialog -> prompt.dismiss());
+                builder.show();
             });
-            return GeckoResult.fromValue(prompt.dismiss());
+            return GeckoResult.fromValue(prompt.confirm());
         }
 
         @Override
