@@ -284,15 +284,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return;
         }
 
-        geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {
-            @Override
-            public void onLoadError(GeckoSession session,
-                                    String uri,
-                                    int category,
-                                    int error) {
-                LOG.e(TAG, "Content load error for " + uri + " category=" + category + " error=" + error);
-            }
-        });
+        geckoSession.setContentDelegate(new GeckoSession.ContentDelegate() {});
 
         geckoSession.setNavigationDelegate(new GeckoSession.NavigationDelegate() {
             @Override
@@ -316,6 +308,15 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         });
 
         geckoSession.setPromptDelegate(new EnginePromptDelegate());
+
+        geckoSession.setProgressDelegate(new GeckoSession.ProgressDelegate() {
+            @Override
+            public void onPageStop(GeckoSession session, boolean success) {
+                if (!success) {
+                    LOG.e(TAG, "Page load failed for " + (session != null ? session.getCurrentUri() : "unknown"));
+                }
+            }
+        });
     }
 
     private GeckoResult<GeckoSession.PromptDelegate.PromptResponse> handleCordovaPrompt(
