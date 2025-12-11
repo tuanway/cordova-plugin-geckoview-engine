@@ -28,12 +28,10 @@
         <source-file src="src/android/MimeTypeHelper.java"
                      target-dir="src/com/cordova/geckoview" />
 
-        <edit-config file="AndroidManifest.xml"
-                     target="/manifest/application"
-                     mode="merge">
-            <application android:networkSecurityConfig="@xml/geckoview_network_security_config"
-                         android:usesCleartextTraffic="true" />
-        </edit-config>
+        <config-file target="AndroidManifest.xml"
+                     parent="/manifest">
+            <uses-permission android:name="android.permission.INTERNET" />
+        </config-file>
 
     </platform>
 
