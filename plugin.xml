@@ -23,6 +23,8 @@
                      target-dir="src/com/cordova/geckoview" />
         <source-file src="src/android/LocalHttpServer.java"
                      target-dir="src/com/cordova/geckoview" />
+        <source-file src="src/android/MimeTypeHelper.java"
+                     target-dir="src/com/cordova/geckoview" />
 
     </platform>
 
