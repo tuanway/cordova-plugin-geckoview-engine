@@ -26,7 +26,6 @@ import org.apache.cordova.LOG;
 import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
-import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
@@ -250,9 +249,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            GeckoRuntimeSettings.Builder builder = new GeckoRuntimeSettings.Builder();
-            builder.allowInsecureConnections(GeckoRuntimeSettings.ALLOW_INSECURE_ALL);
-            sRuntime = GeckoRuntime.create(context.getApplicationContext(), builder.build());
+            sRuntime = GeckoRuntime.create(context.getApplicationContext());
         }
 
         geckoSession = new GeckoSession();
@@ -461,12 +458,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 "cdvfile".equalsIgnoreCase(scheme) ||
                 (TextUtils.isEmpty(scheme) && request.uri.startsWith("cdvfile://"));
         boolean isFileScheme = "file".equalsIgnoreCase(scheme);
+        boolean isLocalHttp = isLocalLoopback(uri);
 
-        if (!isCordovaScheme && !isFileScheme) {
+        if (!isCordovaScheme && !isFileScheme && !isLocalHttp) {
             return null;
         }
 
         Uri resourceTarget = uri;
+        if (isLocalHttp) {
+            resourceTarget = resolveLocalHttpUri(uri);
+        }
         if (resourceTarget == null) {
             return null;
         }
