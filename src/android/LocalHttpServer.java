@@ -243,6 +243,7 @@ class LocalHttpServer {
         if (TextUtils.isEmpty(mimeType)) {
             mimeType = "application/octet-stream";
         }
+        mimeType = MimeTypeHelper.ensureMimeType(servingUri, mimeType);
 
         long length = result.length;
         StringBuilder headers = new StringBuilder();

@@ -575,16 +575,14 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private String resolveMimeType(Uri source, String provided) {
-        if (!TextUtils.isEmpty(provided)) {
-            return provided;
+        String candidate = provided;
+        if (TextUtils.isEmpty(candidate) && resourceApi != null && source != null) {
+            candidate = resourceApi.getMimeType(source);
         }
-        if (resourceApi != null && source != null) {
-            String guessed = resourceApi.getMimeType(source);
-            if (!TextUtils.isEmpty(guessed)) {
-                return guessed;
-            }
+        if (TextUtils.isEmpty(candidate)) {
+            candidate = "application/octet-stream";
         }
-        return "application/octet-stream";
+        return MimeTypeHelper.ensureMimeType(source, candidate);
     }
 
     private String resolveStartAsset(Context context) {
