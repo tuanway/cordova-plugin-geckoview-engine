@@ -104,14 +104,13 @@ class LocalHttpServer {
         boolean permitted = true;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
-                android.security.NetworkSecurityPolicy policy =
-                        android.security.NetworkSecurityPolicy.getInstance();
-                permitted = policy.isCleartextTrafficPermitted("127.0.0.1");
+                permitted = NetworkSecurityPolicy.getInstance()
+                        .isCleartextTrafficPermitted("127.0.0.1");
             } catch (Throwable t) {
                 LOG.w(TAG, "Unable to read NetworkSecurityPolicy", t);
             }
         }
-        LOG.d(TAG, "Cleartext traffic permitted for 127.0.0.1: " + permitted);
+        LOG.d(TAG, "Cleartext 127.0.0.1 permitted: " + permitted);
     }
 
     private void acceptLoop() {
