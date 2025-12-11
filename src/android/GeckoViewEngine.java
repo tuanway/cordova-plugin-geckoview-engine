@@ -153,6 +153,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             clearHistory();
         }
         String rewritten = rewriteStartUrl(url);
+        LOG.d(TAG, "Loading URL -> " + rewritten);
         currentUrl = rewritten;
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
