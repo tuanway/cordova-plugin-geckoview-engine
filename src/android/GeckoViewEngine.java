@@ -376,7 +376,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return;
         }
         try {
-            localServer = new LocalHttpServer(api, null);
+            Context context = containerView != null ? containerView.getContext() : null;
+            localServer = new LocalHttpServer(api, null, context);
             localServer.start();
             serverBaseUrl = localServer.getBaseUrl();
             LOG.d(TAG, "Local server started at " + serverBaseUrl);

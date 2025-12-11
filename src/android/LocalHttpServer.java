@@ -1,5 +1,7 @@
 package com.cordova.geckoview;
 
+import android.content.Context;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.text.TextUtils;
 
@@ -8,6 +10,7 @@ import org.apache.cordova.LOG;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +34,7 @@ class LocalHttpServer {
     private static final String LOCAL_HOST = "127.0.0.1";
     private static final String APP_PREFIX = "/_app_file_";
     private static final String CDV_PREFIX = "/_cdvfile_/";
+    private static final String ANDROID_ASSET_PREFIX = "file:///android_asset/";
     private static final String DEFAULT_APP_BASE = "file:///android_asset/www/";
 
     private final CordovaResourceApi resourceApi;
@@ -40,15 +44,45 @@ class LocalHttpServer {
     private volatile boolean running;
     private String baseUrl;
     private final String appBase;
+    private final AssetManager assetManager;
+    private final String assetListingRoot;
+    private final File fileListingRoot;
     private String defaultRelativePath = "index.html";
 
-    LocalHttpServer(CordovaResourceApi resourceApi, String appBasePath) {
+    LocalHttpServer(CordovaResourceApi resourceApi, String appBasePath, Context context) {
         this.resourceApi = resourceApi;
         String canonicalBase = TextUtils.isEmpty(appBasePath) ? DEFAULT_APP_BASE : appBasePath;
         if (!canonicalBase.endsWith("/")) {
             canonicalBase += "/";
         }
         this.appBase = canonicalBase;
+        if (context != null) {
+            assetManager = context.getAssets();
+        } else {
+            assetManager = null;
+        }
+        if (appBase.startsWith(ANDROID_ASSET_PREFIX)) {
+            String rel = appBase.substring(ANDROID_ASSET_PREFIX.length());
+            while (rel.startsWith("/")) {
+                rel = rel.substring(1);
+            }
+            if (rel.endsWith("/")) {
+                rel = rel.substring(0, rel.length() - 1);
+            }
+            assetListingRoot = rel;
+            fileListingRoot = null;
+        } else {
+            assetListingRoot = null;
+            File root = null;
+            try {
+                Uri uri = Uri.parse(appBase);
+                if ("file".equalsIgnoreCase(uri.getScheme())) {
+                    root = new File(uri.getPath());
+                }
+            } catch (Exception ignored) {
+            }
+            fileListingRoot = root;
+        }
     }
 
     synchronized void start() throws IOException {
@@ -60,6 +94,7 @@ class LocalHttpServer {
         baseUrl = String.format(Locale.US, "http://%s:%d", LOCAL_HOST, serverSocket.getLocalPort());
         acceptThread = new Thread(this::acceptLoop, "GeckoAssetServer");
         acceptThread.start();
+        executor.execute(this::logAppDirectoryContents);
     }
 
     private void acceptLoop() {
@@ -308,5 +343,77 @@ class LocalHttpServer {
         out.write(header.getBytes(StandardCharsets.US_ASCII));
         out.write(body.getBytes(StandardCharsets.UTF_8));
         out.flush();
+    }
+
+    private void logAppDirectoryContents() {
+        if (assetManager != null && assetListingRoot != null) {
+            String rootLabel = TextUtils.isEmpty(assetListingRoot) ? "/" : assetListingRoot;
+            LOG.d(TAG, "Listing Cordova assets under " + rootLabel);
+            try {
+                dumpAssetDirectory(assetListingRoot, "");
+            } catch (IOException e) {
+                LOG.e(TAG, "Failed to enumerate assets for " + rootLabel, e);
+            }
+            return;
+        }
+        if (fileListingRoot != null && fileListingRoot.exists()) {
+            LOG.d(TAG, "Listing Cordova files under " + fileListingRoot.getAbsolutePath());
+            dumpFileDirectory(fileListingRoot, "");
+            return;
+        }
+        LOG.d(TAG, "Asset listing unavailable for base path " + appBase);
+    }
+
+    private void dumpAssetDirectory(String assetPath, String relativePath) throws IOException {
+        String actualPath = assetPath == null ? "" : assetPath;
+        String[] children = assetManager.list(actualPath);
+        if (children == null || children.length == 0) {
+            String name = !TextUtils.isEmpty(relativePath) ? relativePath : actualPath;
+            if (!TextUtils.isEmpty(name)) {
+                LOG.d(TAG, "File: " + name);
+            }
+            return;
+        }
+        for (String child : children) {
+            String childAssetPath = TextUtils.isEmpty(actualPath) ? child : actualPath + "/" + child;
+            String childRelative = TextUtils.isEmpty(relativePath) ? child : relativePath + "/" + child;
+            String[] nested = assetManager.list(childAssetPath);
+            boolean isDirectory = nested != null && nested.length > 0;
+            if (isDirectory) {
+                LOG.d(TAG, "Dir: " + childRelative + "/");
+                dumpAssetDirectory(childAssetPath, childRelative);
+            } else {
+                LOG.d(TAG, "File: " + childRelative);
+            }
+        }
+    }
+
+    private void dumpFileDirectory(File dir, String relativePath) {
+        if (dir == null) {
+            return;
+        }
+        if (!dir.exists()) {
+            LOG.d(TAG, "Path does not exist: " + dir.getAbsolutePath());
+            return;
+        }
+        if (dir.isFile()) {
+            String display = TextUtils.isEmpty(relativePath) ? dir.getName() : relativePath;
+            LOG.d(TAG, "File: " + display);
+            return;
+        }
+        File[] children = dir.listFiles();
+        if (children == null || children.length == 0) {
+            LOG.d(TAG, "Dir: " + (TextUtils.isEmpty(relativePath) ? dir.getName() : relativePath) + "/");
+            return;
+        }
+        for (File child : children) {
+            String childRelative = TextUtils.isEmpty(relativePath) ? child.getName() : relativePath + "/" + child.getName();
+            if (child.isDirectory()) {
+                LOG.d(TAG, "Dir: " + childRelative + "/");
+                dumpFileDirectory(child, childRelative);
+            } else {
+                LOG.d(TAG, "File: " + childRelative);
+            }
+        }
     }
 }
