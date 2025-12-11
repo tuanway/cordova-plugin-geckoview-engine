@@ -304,6 +304,14 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                     cordovaClient.onPageFinishedLoading(url);
                 }
             }
+
+            @Override
+            public void onLoadError(GeckoSession session,
+                                    String uri,
+                                    int category,
+                                    int error) {
+                LOG.e(TAG, "onLoadError for " + uri + " category=" + category + " error=" + error);
+            }
         });
 
         geckoSession.setPromptDelegate(new EnginePromptDelegate());
