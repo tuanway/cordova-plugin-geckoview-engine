@@ -249,10 +249,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            GeckoRuntimeSettings settings = new GeckoRuntimeSettings.Builder()
-                    .lifecycleObserver(false)
-                    .build();
-            sRuntime = GeckoRuntime.create(context.getApplicationContext(), settings);
+            sRuntime = GeckoRuntime.create(context.getApplicationContext());
         }
 
         geckoSession = new GeckoSession();
