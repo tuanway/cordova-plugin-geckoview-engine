@@ -346,7 +346,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 builder.setOnCancelListener(dialog -> prompt.dismiss());
                 builder.show();
             });
-            return GeckoResult.fromValue(prompt.dismiss());
+            return GeckoResult.fromValue(null);
         }
 
         @Override
