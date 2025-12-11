@@ -447,16 +447,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 "cdvfile".equalsIgnoreCase(scheme) ||
                 (TextUtils.isEmpty(scheme) && request.uri.startsWith("cdvfile://"));
         boolean isFileScheme = "file".equalsIgnoreCase(scheme);
-        boolean isLocalHttp = isLocalLoopback(uri);
 
-        if (!isCordovaScheme && !isFileScheme && !isLocalHttp) {
+        if (!isCordovaScheme && !isFileScheme) {
             return null;
         }
 
         Uri resourceTarget = uri;
-        if (isLocalHttp) {
-            resourceTarget = resolveLocalHttpUri(uri);
-        }
         if (resourceTarget == null) {
             return null;
         }
