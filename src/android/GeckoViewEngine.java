@@ -28,6 +28,7 @@ import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
+import org.mozilla.geckoview.GeckoRuntimeSettings;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -249,7 +250,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            sRuntime = GeckoRuntime.create(context.getApplicationContext());
+            GeckoRuntimeSettings.Builder builder = new GeckoRuntimeSettings.Builder();
+            builder.allowInsecureConnections(GeckoRuntimeSettings.ALLOW_INSECURE_ALL);
+            sRuntime = GeckoRuntime.create(context.getApplicationContext(), builder.build());
         }
 
         geckoSession = new GeckoSession();
