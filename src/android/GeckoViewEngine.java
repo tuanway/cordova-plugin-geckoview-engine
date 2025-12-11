@@ -251,7 +251,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         if (sRuntime == null) {
             GeckoRuntimeSettings.Builder builder = new GeckoRuntimeSettings.Builder();
-            builder.allowInsecureConnections(true);
+            builder.allowInsecureConnections(GeckoRuntimeSettings.AllowInsecure.ANY_HOST);
             sRuntime = GeckoRuntime.create(context.getApplicationContext(), builder.build());
         }
 
