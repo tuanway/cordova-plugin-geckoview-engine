@@ -24,6 +24,15 @@
         <source-file src="src/android/LocalHttpServer.java"
                      target-dir="src/com/cordova/geckoview" />
 
+        <edit-config file="AndroidManifest.xml"
+                     mode="merge"
+                     target="/manifest/application">
+            <application android:networkSecurityConfig="@xml/geckoview_network_security_config">
+                <meta-data android:name="org.mozilla.geckoview.LifecycleApplication"
+                           android:value="false" />
+            </application>
+        </edit-config>
+
     </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
