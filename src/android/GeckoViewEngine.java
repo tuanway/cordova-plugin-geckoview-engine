@@ -334,18 +334,19 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 AlertPrompt prompt) {
             Activity activity = cordova != null ? cordova.getActivity() : null;
             if (activity == null) {
-                return GeckoResult.fromValue(prompt.dismiss());
+                prompt.dismiss();
+                return GeckoResult.fromValue(null);
             }
             activity.runOnUiThread(() -> {
                 androidx.appcompat.app.AlertDialog.Builder builder =
                         new androidx.appcompat.app.AlertDialog.Builder(activity);
                 builder.setMessage(prompt.message != null ? prompt.message : "");
                 builder.setPositiveButton(android.R.string.ok,
-                        (dialog, which) -> prompt.confirm());
+                        (dialog, which) -> prompt.dismiss());
                 builder.setOnCancelListener(dialog -> prompt.dismiss());
                 builder.show();
             });
-            return GeckoResult.fromValue(prompt.confirm());
+            return GeckoResult.fromValue(null);
         }
 
         @Override
