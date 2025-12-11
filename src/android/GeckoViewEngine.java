@@ -305,14 +305,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             }
         });
 
-        geckoSession.setPromptDelegate(new GeckoSession.PromptDelegate() {
-            @Override
-            public GeckoResult<GeckoSession.PromptDelegate.PromptResponse> onTextPrompt(
-                    GeckoSession session,
-                    GeckoSession.PromptDelegate.TextPrompt prompt) {
-                return handleCordovaPrompt(prompt);
-            }
-        });
+        geckoSession.setPromptDelegate(new EnginePromptDelegate());
     }
 
     private GeckoResult<GeckoSession.PromptDelegate.PromptResponse> handleCordovaPrompt(
@@ -332,6 +325,35 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
 
         return GeckoResult.fromValue(prompt.confirm(handled));
+    }
+
+    private class EnginePromptDelegate implements GeckoSession.PromptDelegate {
+        @Override
+        public GeckoResult<PromptResponse> onAlert(
+                GeckoSession session,
+                AlertPrompt prompt) {
+            Activity activity = cordova != null ? cordova.getActivity() : null;
+            if (activity == null) {
+                prompt.dismiss();
+                return GeckoResult.fromValue(prompt.dismiss());
+            }
+            activity.runOnUiThread(() -> {
+                new androidx.appcompat.app.AlertDialog.Builder(activity)
+                        .setMessage(prompt.message != null ? prompt.message : "")
+                        .setPositiveButton(android.R.string.ok,
+                                (dialog, which) -> prompt.dismiss())
+                        .setCancelable(true)
+                        .show();
+            });
+            return GeckoResult.fromValue(prompt.dismiss());
+        }
+
+        @Override
+        public GeckoResult<PromptResponse> onTextPrompt(
+                GeckoSession session,
+                TextPrompt prompt) {
+            return handleCordovaPrompt(prompt);
+        }
     }
 
     private void dispatchSyntheticOnlineEvent(boolean online) {
