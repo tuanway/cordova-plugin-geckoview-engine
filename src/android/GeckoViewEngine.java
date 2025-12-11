@@ -313,7 +313,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             @Override
             public void onPageStop(GeckoSession session, boolean success) {
                 if (!success) {
-                    LOG.e(TAG, "Page load failed for " + (session != null ? session.getCurrentUri() : "unknown"));
+                    LOG.e(TAG, "Page load failed for " + (currentUrl != null ? currentUrl : "unknown"));
                 }
             }
         });
