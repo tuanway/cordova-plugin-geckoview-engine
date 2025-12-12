@@ -13,7 +13,7 @@ function convertFileSrc (url) {
     return url;
   }
   if (url.indexOf('cdvfile://') === 0) {
-    return serverUrl + '/_cdvfile/' + encodeURIComponent(url);
+    return serverUrl + '/_cdvfile_/' + encodeURIComponent(url);
   }
   var assetPrefix = 'file:///android_asset/www/';
   if (url.indexOf(assetPrefix) === 0) {

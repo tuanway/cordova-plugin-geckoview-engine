@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 class LocalHttpServer {
 
     private static final String TAG = "LocalHttpServer";
-    private static final String LOCAL_HOST = "127.0.0.1";
+    private static final String LOCAL_HOST = "localhost";
     private static final String APP_PREFIX = "/_app_file_";
     private static final String CDV_PREFIX = "/_cdvfile_/";
     private static final String ANDROID_ASSET_PREFIX = "file:///android_asset/";
@@ -89,7 +89,8 @@ class LocalHttpServer {
         if (running) {
             return;
         }
-        serverSocket = new ServerSocket(0, 0, InetAddress.getByName(null));
+        InetAddress loopback = InetAddress.getLoopbackAddress();
+        serverSocket = new ServerSocket(0, 0, loopback);
         running = true;
         baseUrl = String.format(Locale.US, "http://%s:%d", LOCAL_HOST, serverSocket.getLocalPort());
         acceptThread = new Thread(this::acceptLoop, "GeckoAssetServer");

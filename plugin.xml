@@ -14,6 +14,13 @@
                    custom="true"
                    type="gradleReference" />
 
+        <!-- Allow cleartext HTTP so the embedded localhost server can serve app assets -->
+        <edit-config file="app/src/main/AndroidManifest.xml"
+                     mode="merge"
+                     target="/manifest/application">
+            <application android:usesCleartextTraffic="true" />
+        </edit-config>
+
         <!-- R8/ProGuard rules for GeckoView + Cordova -->
         <resource-file src="src/android/proguard-geckoview.pro"
                        target="app/proguard-geckoview.pro" />
