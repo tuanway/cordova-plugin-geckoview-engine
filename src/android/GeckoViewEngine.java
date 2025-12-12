@@ -26,7 +26,6 @@ import org.apache.cordova.LOG;
 import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
-import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
@@ -154,7 +153,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             clearHistory();
         }
         String rewritten = rewriteStartUrl(url);
-        LOG.d(TAG, "Loading URL -> " + rewritten);
         currentUrl = rewritten;
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
@@ -250,9 +248,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            GeckoRuntimeSettings.Builder builder = new GeckoRuntimeSettings.Builder();
-            builder.allowInsecureConnections(1);
-            sRuntime = GeckoRuntime.create(context.getApplicationContext(), builder.build());
+            sRuntime = GeckoRuntime.create(context.getApplicationContext());
         }
 
         geckoSession = new GeckoSession();
@@ -307,19 +303,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                     cordovaClient.onPageFinishedLoading(url);
                 }
             }
-
         });
 
         geckoSession.setPromptDelegate(new EnginePromptDelegate());
-
-        geckoSession.setProgressDelegate(new GeckoSession.ProgressDelegate() {
-            @Override
-            public void onPageStop(GeckoSession session, boolean success) {
-                if (!success) {
-                    LOG.e(TAG, "Page load failed for " + (currentUrl != null ? currentUrl : "unknown"));
-                }
-            }
-        });
     }
 
     private GeckoResult<GeckoSession.PromptDelegate.PromptResponse> handleCordovaPrompt(

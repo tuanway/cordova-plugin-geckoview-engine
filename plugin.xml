@@ -17,8 +17,6 @@
         <!-- R8/ProGuard rules for GeckoView + Cordova -->
         <resource-file src="src/android/proguard-geckoview.pro"
                        target="app/proguard-geckoview.pro" />
-        <resource-file src="src/android/geckoview_network_security_config.xml"
-                       target="res/xml/geckoview_network_security_config.xml" />
 
         <!-- Engine Java source -->
         <source-file src="src/android/GeckoViewEngine.java"
@@ -28,16 +26,10 @@
         <source-file src="src/android/MimeTypeHelper.java"
                      target-dir="src/com/cordova/geckoview" />
 
-        <config-file target="AndroidManifest.xml"
-                     parent="/manifest">
-            <uses-permission android:name="android.permission.INTERNET" />
-        </config-file>
-
     </platform>
 
     <js-module src="www/geckoview-engine.js" name="GeckoViewEngine">
         <clobbers target="window.GeckoViewEngine" />
     </js-module>
-  
 
 </plugin>

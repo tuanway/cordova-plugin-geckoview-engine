@@ -86,7 +86,7 @@ dependencies {
     implementation project(':CordovaLib')
 
     // GeckoView engine (regular, not omni, to keep size down)
-    implementation "org.mozilla.geckoview:geckoview:141.0.20250806102122"
+    implementation "org.mozilla.geckoview:geckoview:143.0.20251003115653"
 }
 
 // Cordova hooks (this line is normally at the end of app/build.gradle)

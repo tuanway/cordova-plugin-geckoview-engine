@@ -3,8 +3,6 @@ package com.cordova.geckoview;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.net.Uri;
-import android.os.Build;
-import android.security.NetworkSecurityPolicy;
 import android.text.TextUtils;
 
 import org.apache.cordova.CordovaResourceApi;
@@ -97,20 +95,6 @@ class LocalHttpServer {
         acceptThread = new Thread(this::acceptLoop, "GeckoAssetServer");
         acceptThread.start();
         executor.execute(this::logAppDirectoryContents);
-        logCleartextPolicy();
-    }
-
-    private void logCleartextPolicy() {
-        boolean permitted = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                permitted = NetworkSecurityPolicy.getInstance()
-                        .isCleartextTrafficPermitted("127.0.0.1");
-            } catch (Throwable t) {
-                LOG.w(TAG, "Unable to read NetworkSecurityPolicy", t);
-            }
-        }
-        LOG.d(TAG, "Cleartext 127.0.0.1 permitted: " + permitted);
     }
 
     private void acceptLoop() {
