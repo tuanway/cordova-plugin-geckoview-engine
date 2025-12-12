@@ -1,6 +1,7 @@
 package com.cordova.geckoview;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.text.TextUtils;
@@ -36,6 +37,7 @@ class LocalHttpServer {
     private static final String CDV_PREFIX = "/_cdvfile_/";
     private static final String ANDROID_ASSET_PREFIX = "file:///android_asset/";
     private static final String DEFAULT_APP_BASE = "file:///android_asset/www/";
+    private static final int FIXED_PORT = 8080;
 
     private final CordovaResourceApi resourceApi;
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -48,9 +50,11 @@ class LocalHttpServer {
     private final String assetListingRoot;
     private final File fileListingRoot;
     private String defaultRelativePath = "index.html";
+    private final Context appContext;
 
     LocalHttpServer(CordovaResourceApi resourceApi, String appBasePath, Context context) {
         this.resourceApi = resourceApi;
+        this.appContext = context != null ? context.getApplicationContext() : null;
         String canonicalBase = TextUtils.isEmpty(appBasePath) ? DEFAULT_APP_BASE : appBasePath;
         if (!canonicalBase.endsWith("/")) {
             canonicalBase += "/";
@@ -90,7 +94,7 @@ class LocalHttpServer {
             return;
         }
         InetAddress loopback = InetAddress.getLoopbackAddress();
-        serverSocket = new ServerSocket(0, 0, loopback);
+        serverSocket = new ServerSocket(FIXED_PORT, 0, loopback);
         running = true;
         baseUrl = String.format(Locale.US, "http://%s:%d", LOCAL_HOST, serverSocket.getLocalPort());
         acceptThread = new Thread(this::acceptLoop, "GeckoAssetServer");
@@ -124,6 +128,14 @@ class LocalHttpServer {
             serverSocket = null;
         }
         executor.shutdownNow();
+    }
+
+    private int loadPreferredPort() {
+        return FIXED_PORT;
+    }
+
+    private void savePreferredPort(int port) {
+        // No-op; fixed port
     }
 
     String getBaseUrl() {

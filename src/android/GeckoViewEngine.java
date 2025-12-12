@@ -2,6 +2,7 @@ package com.cordova.geckoview;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
 import android.text.TextUtils;
@@ -26,6 +27,7 @@ import org.apache.cordova.LOG;
 import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
+import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
 
@@ -251,7 +253,20 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView = new GeckoView(context);
 
         if (sRuntime == null) {
-            sRuntime = GeckoRuntime.create(context.getApplicationContext());
+            boolean enableRemoteDebug = isDebugBuild(context);
+            int debugPort = 6080;
+            GeckoRuntimeSettings.Builder settingsBuilder = new GeckoRuntimeSettings.Builder();
+            if (enableRemoteDebug) {
+                settingsBuilder
+                        .remoteDebuggingEnabled(true)
+                        .remoteDebuggingPort(debugPort)
+                        .config("devtools.debugger.remote-enabled", true)
+                        .config("devtools.debugger.remote-port", debugPort)
+                        .config("devtools.debugger.remote-host", "localhost")
+                        .config("devtools.debugger.prompt-connection", false);
+            }
+            GeckoRuntimeSettings settings = settingsBuilder.build();
+            sRuntime = GeckoRuntime.create(context.getApplicationContext(), settings);
         }
 
         geckoSession = new GeckoSession();
@@ -267,6 +282,18 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
+    }
+
+    private boolean isDebugBuild(Context context) {
+        if (context == null) {
+            return false;
+        }
+        try {
+            ApplicationInfo info = context.getApplicationInfo();
+            return (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void recreateSession() {
