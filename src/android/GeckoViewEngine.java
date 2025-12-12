@@ -34,6 +34,7 @@ import org.mozilla.geckoview.GeckoView;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -41,7 +42,7 @@ import org.xmlpull.v1.XmlPullParserException;
 /**
  * Minimal, stable GeckoView-based Cordova WebView engine.
  *
- * - GeckoView 143.x compatible
+ * - GeckoView 146.x compatible
  * - Cordova-Android 10+ CordovaWebViewEngine interface compatible
  * - JS-based back navigation (window.history.back())
  */
@@ -254,16 +255,14 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         if (sRuntime == null) {
             boolean enableRemoteDebug = isDebugBuild(context);
-            int debugPort = 6080;
             GeckoRuntimeSettings.Builder settingsBuilder = new GeckoRuntimeSettings.Builder();
             if (enableRemoteDebug) {
+                List<String> runtimeArgs = new ArrayList<>();
+                runtimeArgs.add("-start-debugger-server");
+                runtimeArgs.add("6000");
                 settingsBuilder
                         .remoteDebuggingEnabled(true)
-                        .remoteDebuggingPort(debugPort)
-                        .config("devtools.debugger.remote-enabled", true)
-                        .config("devtools.debugger.remote-port", debugPort)
-                        .config("devtools.debugger.remote-host", "localhost")
-                        .config("devtools.debugger.prompt-connection", false);
+                        .arguments(runtimeArgs.toArray(new String[0]));
             }
             GeckoRuntimeSettings settings = settingsBuilder.build();
             sRuntime = GeckoRuntime.create(context.getApplicationContext(), settings);
