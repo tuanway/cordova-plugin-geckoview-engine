@@ -9,6 +9,14 @@
 
     <platform name="android">
 
+        <!-- Make GeckoView the active Cordova WebView engine -->
+        <edit-config file="app/src/main/res/xml/config.xml"
+                     mode="merge"
+                     target="/widget">
+            <preference name="webView"
+                        value="com.cordova.geckoview.GeckoViewEngine" />
+        </edit-config>
+
         <!-- Inject custom Gradle config: repos, GeckoView dep, ABI filters, Java 17, packaging -->
         <framework src="src/android/build.gradle"
                    custom="true"
