@@ -71,7 +71,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
     protected String startPageUri;
-    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 1500;
+    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 3000;
     private Runnable overlayHideRunnable;
     private long overlayVisibleSince;
     protected View startupOverlay;
