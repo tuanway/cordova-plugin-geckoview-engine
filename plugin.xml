@@ -12,7 +12,8 @@
         <!-- Make GeckoView the active Cordova WebView engine -->
         <edit-config file="app/src/main/res/xml/config.xml"
                      mode="merge"
-                     target="/widget">
+                     target="/widget"
+                     id="geckoview-engine-webview-pref">
             <preference name="webView"
                         value="com.cordova.geckoview.GeckoViewEngine" />
         </edit-config>
@@ -25,7 +26,8 @@
         <!-- Allow cleartext HTTP so the embedded localhost server can serve app assets -->
         <edit-config file="app/src/main/AndroidManifest.xml"
                      mode="merge"
-                     target="/manifest/application">
+                     target="/manifest/application"
+                     id="geckoview-engine-cleartext">
             <application android:usesCleartextTraffic="true" />
         </edit-config>
 
