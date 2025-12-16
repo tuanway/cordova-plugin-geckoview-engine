@@ -234,16 +234,47 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
     }
 
+    // @Override
+    // public void evaluateJavascript(String js, ValueCallback<String> callback) {
+    //     if (geckoSession != null) {
+    //         geckoSession.loadUri("javascript:" + js);
+    //     }
+    //     if (callback != null) {
+    //         // GeckoView doesn't return JS results through this API
+    //         callback.onReceiveValue(null);
+    //     }
+    // }
     @Override
     public void evaluateJavascript(String js, ValueCallback<String> callback) {
-        if (geckoSession != null) {
-            geckoSession.loadUri("javascript:" + js);
+        if (geckoSession == null || TextUtils.isEmpty(js)) {
+            if (callback != null) callback.onReceiveValue(null);
+            return;
         }
-        if (callback != null) {
-            // GeckoView doesn't return JS results through this API
-            callback.onReceiveValue(null);
-        }
+
+        Activity a = (cordova != null) ? cordova.getActivity() : null;
+        Runnable r = () -> {
+            try {
+                // GeckoView API: evaluateJS returns GeckoResult<Object>
+                geckoSession.evaluateJS(js).accept(
+                    value -> {
+                        if (callback != null) callback.onReceiveValue(value != null ? String.valueOf(value) : null);
+                    },
+                    err -> {
+                        LOG.e(TAG, "evaluateJS error", err);
+                        if (callback != null) callback.onReceiveValue(null);
+                    }
+                );
+            } catch (Throwable t) {
+                LOG.e(TAG, "evaluateJavascript failed", t);
+                if (callback != null) callback.onReceiveValue(null);
+            }
+        };
+
+        if (a != null) a.runOnUiThread(r);
+        else r.run();
     }
+
+    
 
     // -------------------------------------------------------------------------
     // Internal helpers
