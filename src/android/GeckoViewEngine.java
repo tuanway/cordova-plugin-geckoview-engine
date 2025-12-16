@@ -119,10 +119,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                                 }
                             }
                     ));
-            // nativeToJsMessageQueue.addBridgeMode(
-            //         new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
             nativeToJsMessageQueue.addBridgeMode(
-                        new NativeToJsMessageQueue.LoadUrlBridgeMode(this, cordova));
+                    new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
             bridgeModeConfigured = true;
         }
 
@@ -152,41 +150,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         return containerView;
     }
 
-    // @Override
-    // public void loadUrl(String url, boolean clearNavigationStack) {
-    //     if (clearNavigationStack) {
-    //         clearHistory();
-    //     }
-    //     String rewritten = rewriteStartUrl(url);
-    //     if (cordovaClient != null) {
-    //         cordovaClient.onPageStarted(rewritten);
-    //     }
-    //     currentUrl = rewritten;
-    //     if (geckoSession != null) {
-    //         geckoSession.loadUri(rewritten);
-    //     }
-    // }
-
     @Override
     public void loadUrl(String url, boolean clearNavigationStack) {
         if (clearNavigationStack) {
             clearHistory();
         }
-
-        if (url != null && url.startsWith("javascript:")) {
-            // IMPORTANT: do not rewrite javascript: URLs
-            if (geckoSession != null) geckoSession.loadUri(url);
-            return;
-        }
-
         String rewritten = rewriteStartUrl(url);
-
         if (cordovaClient != null) {
             cordovaClient.onPageStarted(rewritten);
         }
-
         currentUrl = rewritten;
-
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
         }
@@ -261,27 +234,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         }
     }
 
-    // @Override
-    // public void evaluateJavascript(String js, ValueCallback<String> callback) {
-    //     if (geckoSession != null) {
-    //         geckoSession.loadUri("javascript:" + js);
-    //     }
-    //     if (callback != null) {
-    //         // GeckoView doesn't return JS results through this API
-    //         callback.onReceiveValue(null);
-    //     }
-    // }
-
     @Override
     public void evaluateJavascript(String js, ValueCallback<String> callback) {
-        if (js == null) {
-            if (callback != null) callback.onReceiveValue(null);
-            return;
+        if (geckoSession != null) {
+            geckoSession.loadUri("javascript:" + js);
         }
-        loadUrl("javascript:" + js, false);
-        if (callback != null) callback.onReceiveValue(null);
-}
-
+        if (callback != null) {
+            // GeckoView doesn't return JS results through this API
+            callback.onReceiveValue(null);
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Internal helpers
