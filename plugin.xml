@@ -9,6 +9,9 @@
 
     <platform name="android">
 
+        <hook type="before_plugin_install"
+              src="scripts/cleanup-android-config-munge.js" />
+
         <!-- Make GeckoView the active Cordova WebView engine -->
         <edit-config file="app/src/main/res/xml/config.xml"
                      mode="merge"
@@ -31,6 +34,12 @@
                      target="/manifest/application"
                      id="geckoview-engine-cleartext">
             <application android:usesCleartextTraffic="true" />
+        </edit-config>
+        <edit-config file="app/src/main/AndroidManifest.xml"
+                     mode="merge"
+                     target="/manifest/application"
+                     id="geckoview-engine-window-bg">
+            <application android:windowBackground="@android:color/black" />
         </edit-config>
 
         <!-- R8/ProGuard rules for GeckoView + Cordova -->
