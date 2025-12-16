@@ -119,8 +119,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                                 }
                             }
                     ));
+            // nativeToJsMessageQueue.addBridgeMode(
+            //         new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
             nativeToJsMessageQueue.addBridgeMode(
-                    new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
+                        new NativeToJsMessageQueue.LoadUrlBridgeMode(this, cordova));
             bridgeModeConfigured = true;
         }
 
@@ -150,16 +152,41 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         return containerView;
     }
 
+    // @Override
+    // public void loadUrl(String url, boolean clearNavigationStack) {
+    //     if (clearNavigationStack) {
+    //         clearHistory();
+    //     }
+    //     String rewritten = rewriteStartUrl(url);
+    //     if (cordovaClient != null) {
+    //         cordovaClient.onPageStarted(rewritten);
+    //     }
+    //     currentUrl = rewritten;
+    //     if (geckoSession != null) {
+    //         geckoSession.loadUri(rewritten);
+    //     }
+    // }
+
     @Override
     public void loadUrl(String url, boolean clearNavigationStack) {
         if (clearNavigationStack) {
             clearHistory();
         }
+
+        if (url != null && url.startsWith("javascript:")) {
+            // IMPORTANT: do not rewrite javascript: URLs
+            if (geckoSession != null) geckoSession.loadUri(url);
+            return;
+        }
+
         String rewritten = rewriteStartUrl(url);
+
         if (cordovaClient != null) {
             cordovaClient.onPageStarted(rewritten);
         }
+
         currentUrl = rewritten;
+
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
         }
@@ -244,37 +271,17 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     //         callback.onReceiveValue(null);
     //     }
     // }
+
     @Override
     public void evaluateJavascript(String js, ValueCallback<String> callback) {
-        if (geckoSession == null || TextUtils.isEmpty(js)) {
+        if (js == null) {
             if (callback != null) callback.onReceiveValue(null);
             return;
         }
+        loadUrl("javascript:" + js, false);
+        if (callback != null) callback.onReceiveValue(null);
+}
 
-        Activity a = (cordova != null) ? cordova.getActivity() : null;
-        Runnable r = () -> {
-            try {
-                // GeckoView API: evaluateJS returns GeckoResult<Object>
-                geckoSession.evaluateJS(js).accept(
-                    value -> {
-                        if (callback != null) callback.onReceiveValue(value != null ? String.valueOf(value) : null);
-                    },
-                    err -> {
-                        LOG.e(TAG, "evaluateJS error", err);
-                        if (callback != null) callback.onReceiveValue(null);
-                    }
-                );
-            } catch (Throwable t) {
-                LOG.e(TAG, "evaluateJavascript failed", t);
-                if (callback != null) callback.onReceiveValue(null);
-            }
-        };
-
-        if (a != null) a.runOnUiThread(r);
-        else r.run();
-    }
-
-    
 
     // -------------------------------------------------------------------------
     // Internal helpers
