@@ -6,6 +6,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Xml;
@@ -104,6 +105,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.resourceApi = resourceApi;
         this.pluginManager = pluginManager;
         this.nativeToJsMessageQueue = nativeToJsMessageQueue;
+
+        applyDarkStartupBackground();
 
         if (nativeToJsMessageQueue != null && cordova != null && !bridgeModeConfigured) {
             nativeToJsMessageQueue.addBridgeMode(
@@ -285,6 +288,26 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
+    }
+
+    private void applyDarkStartupBackground() {
+        if (parentWebView != null) {
+            parentWebView.getView().setBackgroundColor(Color.BLACK);
+        }
+        if (cordova != null) {
+            Activity activity = cordova.getActivity();
+            if (activity != null) {
+                activity.runOnUiThread(() -> {
+                    activity.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+                    View decor = activity.getWindow().getDecorView();
+                    decor.setBackgroundColor(Color.BLACK);
+                    View rootView = activity.findViewById(android.R.id.content);
+                    if (rootView != null) {
+                        rootView.setBackgroundColor(Color.BLACK);
+                    }
+                });
+            }
+        }
     }
 
     private boolean isDebugBuild(Context context) {
