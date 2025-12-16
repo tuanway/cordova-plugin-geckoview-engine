@@ -70,6 +70,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
     protected String startPageUri;
+    protected View startupOverlay;
 
     // Track current URL for Cordova's getUrl()
     protected String currentUrl;
@@ -164,6 +165,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             cordovaClient.onPageStarted(rewritten);
         }
         currentUrl = rewritten;
+        showStartupOverlay();
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
         }
@@ -236,6 +238,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             containerView.removeView(geckoView);
             geckoView = null;
         }
+        if (startupOverlay != null && containerView != null) {
+            containerView.removeView(startupOverlay);
+            startupOverlay = null;
+        }
     }
 
     @Override
@@ -259,6 +265,14 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         // Use a dark background during startup to avoid the default white flash
         containerView.setBackgroundColor(Color.BLACK);
         geckoView.setBackgroundColor(Color.BLACK);
+        startupOverlay = new View(context);
+        startupOverlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        startupOverlay.setBackgroundColor(Color.BLACK);
+        startupOverlay.setClickable(true);
+        startupOverlay.setFocusable(true);
+        startupOverlay.setFocusableInTouchMode(true);
 
         if (sRuntime == null) {
             boolean enableRemoteDebug = isDebugBuild(context);
@@ -288,6 +302,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
+        containerView.addView(
+                startupOverlay,
+                new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT)
+        );
     }
 
     private void applyDarkStartupBackground() {
@@ -307,6 +327,36 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                     }
                 });
             }
+        }
+    }
+
+    private void showStartupOverlay() {
+        setStartupOverlayVisibility(true);
+    }
+
+    private void hideStartupOverlay() {
+        setStartupOverlayVisibility(false);
+    }
+
+    private void setStartupOverlayVisibility(boolean visible) {
+        if (startupOverlay == null) {
+            return;
+        }
+        Runnable update = () -> {
+            if (startupOverlay == null) {
+                return;
+            }
+            if (visible) {
+                startupOverlay.setVisibility(View.VISIBLE);
+                startupOverlay.bringToFront();
+            } else {
+                startupOverlay.setVisibility(View.GONE);
+            }
+        };
+        if (containerView != null) {
+            containerView.post(update);
+        } else {
+            update.run();
         }
     }
 
@@ -358,6 +408,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 if (cordovaClient != null) {
                     cordovaClient.onPageFinishedLoading(url);
                 }
+                hideStartupOverlay();
             }
         });
 
