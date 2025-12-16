@@ -7,6 +7,7 @@ import android.content.res.XmlResourceParser;
 import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Xml;
@@ -70,6 +71,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
     protected String startPageUri;
+    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 1500;
+    private Runnable overlayHideRunnable;
+    private long overlayVisibleSince;
     protected View startupOverlay;
 
     // Track current URL for Cordova's getUrl()
@@ -238,6 +242,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             containerView.removeView(geckoView);
             geckoView = null;
         }
+        cancelPendingOverlayHide();
         if (startupOverlay != null && containerView != null) {
             containerView.removeView(startupOverlay);
             startupOverlay = null;
@@ -331,11 +336,13 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private void showStartupOverlay() {
+        cancelPendingOverlayHide();
+        overlayVisibleSince = SystemClock.uptimeMillis();
         setStartupOverlayVisibility(true);
     }
 
     private void hideStartupOverlay() {
-        setStartupOverlayVisibility(false);
+        scheduleStartupOverlayHide();
     }
 
     private void setStartupOverlayVisibility(boolean visible) {
@@ -357,6 +364,32 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             containerView.post(update);
         } else {
             update.run();
+        }
+    }
+
+    private void scheduleStartupOverlayHide() {
+        if (startupOverlay == null) {
+            return;
+        }
+        cancelPendingOverlayHide();
+        long elapsed = SystemClock.uptimeMillis() - overlayVisibleSince;
+        long delay = STARTUP_OVERLAY_MIN_DURATION_MS - elapsed;
+        Runnable hideAction = () -> {
+            setStartupOverlayVisibility(false);
+            overlayHideRunnable = null;
+        };
+        if (delay <= 0) {
+            startupOverlay.post(hideAction);
+            return;
+        }
+        overlayHideRunnable = hideAction;
+        startupOverlay.postDelayed(hideAction, delay);
+    }
+
+    private void cancelPendingOverlayHide() {
+        if (overlayHideRunnable != null && startupOverlay != null) {
+            startupOverlay.removeCallbacks(overlayHideRunnable);
+            overlayHideRunnable = null;
         }
     }
 
