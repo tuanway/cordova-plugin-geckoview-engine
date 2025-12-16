@@ -71,7 +71,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
     protected String startPageUri;
-    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 3000;
+    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 1500;
     private Runnable overlayHideRunnable;
     private long overlayVisibleSince;
     protected View startupOverlay;
@@ -441,6 +441,17 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 if (cordovaClient != null) {
                     cordovaClient.onPageFinishedLoading(url);
                 }
+            }
+        });
+
+        geckoSession.setProgressDelegate(new GeckoSession.ProgressDelegate() {
+            @Override
+            public void onPageStart(GeckoSession session, String uri) {
+                showStartupOverlay();
+            }
+
+            @Override
+            public void onPageStop(GeckoSession session, boolean isError) {
                 hideStartupOverlay();
             }
         });
