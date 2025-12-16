@@ -5,9 +5,6 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
-import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Xml;
@@ -71,10 +68,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     protected LocalHttpServer localServer;
     protected String serverBaseUrl;
     protected String startPageUri;
-    private static final long STARTUP_OVERLAY_MIN_DURATION_MS = 1500;
-    private Runnable overlayHideRunnable;
-    private long overlayVisibleSince;
-    protected View startupOverlay;
 
     // Track current URL for Cordova's getUrl()
     protected String currentUrl;
@@ -110,8 +103,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         this.resourceApi = resourceApi;
         this.pluginManager = pluginManager;
         this.nativeToJsMessageQueue = nativeToJsMessageQueue;
-
-        applyDarkStartupBackground();
 
         if (nativeToJsMessageQueue != null && cordova != null && !bridgeModeConfigured) {
             nativeToJsMessageQueue.addBridgeMode(
@@ -169,7 +160,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             cordovaClient.onPageStarted(rewritten);
         }
         currentUrl = rewritten;
-        showStartupOverlay();
         if (geckoSession != null) {
             geckoSession.loadUri(rewritten);
         }
@@ -242,11 +232,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             containerView.removeView(geckoView);
             geckoView = null;
         }
-        cancelPendingOverlayHide();
-        if (startupOverlay != null && containerView != null) {
-            containerView.removeView(startupOverlay);
-            startupOverlay = null;
-        }
     }
 
     @Override
@@ -267,17 +252,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     private void createGeckoView(Context context) {
         containerView = new EngineFrameLayout(context);
         geckoView = new GeckoView(context);
-        // Use a dark background during startup to avoid the default white flash
-        containerView.setBackgroundColor(Color.BLACK);
-        geckoView.setBackgroundColor(Color.BLACK);
-        startupOverlay = new View(context);
-        startupOverlay.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-        startupOverlay.setBackgroundColor(Color.BLACK);
-        startupOverlay.setClickable(true);
-        startupOverlay.setFocusable(true);
-        startupOverlay.setFocusableInTouchMode(true);
 
         if (sRuntime == null) {
             boolean enableRemoteDebug = isDebugBuild(context);
@@ -307,90 +281,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
-        containerView.addView(
-                startupOverlay,
-                new FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT)
-        );
-    }
-
-    private void applyDarkStartupBackground() {
-        if (parentWebView != null) {
-            parentWebView.getView().setBackgroundColor(Color.BLACK);
-        }
-        if (cordova != null) {
-            Activity activity = cordova.getActivity();
-            if (activity != null) {
-                activity.runOnUiThread(() -> {
-                    activity.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
-                    View decor = activity.getWindow().getDecorView();
-                    decor.setBackgroundColor(Color.BLACK);
-                    View rootView = activity.findViewById(android.R.id.content);
-                    if (rootView != null) {
-                        rootView.setBackgroundColor(Color.BLACK);
-                    }
-                });
-            }
-        }
-    }
-
-    private void showStartupOverlay() {
-        cancelPendingOverlayHide();
-        overlayVisibleSince = SystemClock.uptimeMillis();
-        setStartupOverlayVisibility(true);
-    }
-
-    private void hideStartupOverlay() {
-        scheduleStartupOverlayHide();
-    }
-
-    private void setStartupOverlayVisibility(boolean visible) {
-        if (startupOverlay == null) {
-            return;
-        }
-        Runnable update = () -> {
-            if (startupOverlay == null) {
-                return;
-            }
-            if (visible) {
-                startupOverlay.setVisibility(View.VISIBLE);
-                startupOverlay.bringToFront();
-            } else {
-                startupOverlay.setVisibility(View.GONE);
-            }
-        };
-        if (containerView != null) {
-            containerView.post(update);
-        } else {
-            update.run();
-        }
-    }
-
-    private void scheduleStartupOverlayHide() {
-        if (startupOverlay == null) {
-            return;
-        }
-        cancelPendingOverlayHide();
-        long elapsed = SystemClock.uptimeMillis() - overlayVisibleSince;
-        long delay = STARTUP_OVERLAY_MIN_DURATION_MS - elapsed;
-        Runnable hideAction = () -> {
-            setStartupOverlayVisibility(false);
-            overlayHideRunnable = null;
-        };
-        if (delay <= 0) {
-            startupOverlay.post(hideAction);
-            return;
-        }
-        overlayHideRunnable = hideAction;
-        startupOverlay.postDelayed(hideAction, delay);
-    }
-
-    private void cancelPendingOverlayHide() {
-        if (overlayHideRunnable != null && startupOverlay != null) {
-            startupOverlay.removeCallbacks(overlayHideRunnable);
-            overlayHideRunnable = null;
-        }
     }
 
     private boolean isDebugBuild(Context context) {
@@ -441,18 +331,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                 if (cordovaClient != null) {
                     cordovaClient.onPageFinishedLoading(url);
                 }
-            }
-        });
-
-        geckoSession.setProgressDelegate(new GeckoSession.ProgressDelegate() {
-            @Override
-            public void onPageStart(GeckoSession session, String uri) {
-                showStartupOverlay();
-            }
-
-            @Override
-            public void onPageStop(GeckoSession session, boolean isError) {
-                hideStartupOverlay();
             }
         });
 
