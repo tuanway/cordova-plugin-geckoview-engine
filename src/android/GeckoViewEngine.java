@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.res.XmlResourceParser;
 import android.net.Uri;
+import android.graphics.Color;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Xml;
@@ -252,6 +253,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     private void createGeckoView(Context context) {
         containerView = new EngineFrameLayout(context);
         geckoView = new GeckoView(context);
+        // Use a dark background during startup to avoid the default white flash
+        containerView.setBackgroundColor(Color.BLACK);
+        geckoView.setBackgroundColor(Color.BLACK);
 
         if (sRuntime == null) {
             boolean enableRemoteDebug = isDebugBuild(context);
