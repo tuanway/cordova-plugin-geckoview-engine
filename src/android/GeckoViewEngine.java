@@ -7,7 +7,6 @@ import android.content.res.XmlResourceParser;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.util.Xml;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -24,30 +23,43 @@ import org.apache.cordova.NativeToJsMessageQueue;
 import org.apache.cordova.PluginManager;
 import org.apache.cordova.LOG;
 
+import org.json.JSONObject;
+
 import org.mozilla.geckoview.AllowOrDeny;
 import org.mozilla.geckoview.GeckoResult;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
+import org.mozilla.geckoview.WebExtension;
+import org.mozilla.geckoview.WebExtensionController;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 
 /**
- * Minimal, stable GeckoView-based Cordova WebView engine.
+ * GeckoView-based Cordova WebView engine.
  *
- * - GeckoView 146.x compatible
- * - Cordova-Android 10+ CordovaWebViewEngine interface compatible
- * - JS-based back navigation (window.history.back())
+ * Notes:
+ * - Uses Cordova's prompt bridge (JS->native) via GeckoSession.PromptDelegate
+ * - Uses a built-in WebExtension Port bridge (native->JS) to make EvalBridgeMode reliable
  */
 public class GeckoViewEngine implements CordovaWebViewEngine {
     private static final String TAG = "GeckoViewEngine";
+
+    // WebExtension bridge constants
+    private static final String EXT_ID = "cordova-bridge@example.com";
+    private static final String EXT_URI = "resource://android/assets/cordova_bridge/";
+    private static final String NATIVE_APP = "cordova";
 
     // Cordova state
     protected CordovaWebView parentWebView;
@@ -71,6 +83,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     // Track current URL for Cordova's getUrl()
     protected String currentUrl;
+
+    // WebExtension port for native->JS messages
+    private WebExtension.Port cordovaPort;
+    private int evalSeq = 1;
+    private final Map<Integer, ValueCallback<String>> evalCallbacks = new ConcurrentHashMap<>();
+    private final Deque<String> earlyEvalQueue = new ArrayDeque<>();
 
     // No-op cookie manager (Cordova requires an instance)
     protected final ICordovaCookieManager cookieManager = new NoopCookieManager();
@@ -119,8 +137,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                                 }
                             }
                     ));
+
+            // Cordova will use evaluateJavascript() for EvalBridgeMode.
             nativeToJsMessageQueue.addBridgeMode(
                     new NativeToJsMessageQueue.EvalBridgeMode(this, cordova));
+
             bridgeModeConfigured = true;
         }
 
@@ -155,6 +176,15 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         if (clearNavigationStack) {
             clearHistory();
         }
+
+        // IMPORTANT: do not rewrite or intercept javascript: URLs.
+        if (url != null && url.startsWith("javascript:")) {
+            if (geckoSession != null) {
+                geckoSession.loadUri(url);
+            }
+            return;
+        }
+
         String rewritten = rewriteStartUrl(url);
         if (cordovaClient != null) {
             cordovaClient.onPageStarted(rewritten);
@@ -179,7 +209,6 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public void clearCache() {
-        // Approximate cache clearing by forcing a cache-bypass reload
         if (geckoSession != null && currentUrl != null) {
             geckoSession.reload(GeckoSession.LOAD_FLAGS_BYPASS_CACHE);
         }
@@ -196,16 +225,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public boolean canGoBack() {
-        // We don't see native history state; let Cordova attempt JS-level back.
         return true;
     }
 
     @Override
     public boolean goBack() {
-        // Use JS to navigate browser history instead of GeckoSession.canGoBack()/goBack()
-        String js = "if (window.history && window.history.length > 1) {" +
-                    "window.history.back();" +
-                    "}";
+        String js = "if (window.history && window.history.length > 1) { window.history.back(); }";
         evaluateJavascript(js, null);
         return true;
     }
@@ -232,15 +257,50 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             containerView.removeView(geckoView);
             geckoView = null;
         }
+        cordovaPort = null;
+        earlyEvalQueue.clear();
+        evalCallbacks.clear();
     }
 
+    /**
+     * Called by Cordova EvalBridgeMode to deliver native->JS messages.
+     *
+     * We deliver JS through a WebExtension Port (content script) for reliability.
+     * If the port isn't ready yet, we queue a small amount of early JS (deviceready path).
+     */
     @Override
     public void evaluateJavascript(String js, ValueCallback<String> callback) {
-        if (geckoSession != null) {
-            geckoSession.loadUri("javascript:" + js);
+        if (callback == null) {
+            callback = value -> {};
         }
-        if (callback != null) {
-            // GeckoView doesn't return JS results through this API
+
+        WebExtension.Port p = cordovaPort;
+        if (p == null) {
+            // Queue early bootstrap messages until extension connects.
+            synchronized (earlyEvalQueue) {
+                if (earlyEvalQueue.size() < 256) {
+                    earlyEvalQueue.addLast(js);
+                } else {
+                    // Drop oldest to avoid unbounded growth
+                    earlyEvalQueue.pollFirst();
+                    earlyEvalQueue.addLast(js);
+                }
+            }
+            callback.onReceiveValue(null);
+            return;
+        }
+
+        int id = evalSeq++;
+        evalCallbacks.put(id, callback);
+
+        try {
+            JSONObject msg = new JSONObject();
+            msg.put("type", "EVAL");
+            msg.put("id", id);
+            msg.put("code", js);
+            p.postMessage(msg);
+        } catch (Exception e) {
+            evalCallbacks.remove(id);
             callback.onReceiveValue(null);
         }
     }
@@ -275,12 +335,96 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         rebindSessionDelegates();
 
+        // Install/ensure built-in WebExtension and wait for connectNative("cordova")
+        ensureCordovaBridgeExtension();
+
         containerView.addView(
                 geckoView,
                 new FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT)
         );
+    }
+
+    private void ensureCordovaBridgeExtension() {
+        if (sRuntime == null) return;
+
+        WebExtensionController controller = sRuntime.getWebExtensionController();
+        controller.ensureBuiltIn(EXT_URI, EXT_ID).accept(
+                ext -> {
+                    LOG.d(TAG, "Cordova bridge extension ensured: " + ext.id);
+
+                    // Set delegate for the nativeApp id ("cordova")
+                    ext.setMessageDelegate(new WebExtension.MessageDelegate() {
+                        @Override
+                        public void onConnect(final WebExtension.Port port) {
+                            LOG.d(TAG, "Cordova bridge port connected");
+                            cordovaPort = port;
+                            port.setDelegate(new WebExtension.PortDelegate() {
+                                @Override
+                                public void onPortMessage(final Object message, final WebExtension.Port p) {
+                                    if (message instanceof JSONObject) {
+                                        handlePortMessage((JSONObject) message);
+                                    } else {
+                                        LOG.d(TAG, "Port message: " + String.valueOf(message));
+                                    }
+                                }
+
+                                @Override
+                                public void onDisconnect(final WebExtension.Port p) {
+                                    if (cordovaPort == p) {
+                                        cordovaPort = null;
+                                    }
+                                }
+                            });
+
+                            // Flush early queued JS now that the port is available.
+                            flushEarlyEvalQueue();
+                        }
+                    }, NATIVE_APP);
+                },
+                e -> LOG.e(TAG, "Failed to ensure Cordova bridge extension", e)
+        );
+    }
+
+    private void flushEarlyEvalQueue() {
+        WebExtension.Port p = cordovaPort;
+        if (p == null) return;
+
+        List<String> toSend = new ArrayList<>();
+        synchronized (earlyEvalQueue) {
+            while (!earlyEvalQueue.isEmpty()) {
+                toSend.add(earlyEvalQueue.pollFirst());
+            }
+        }
+
+        for (String js : toSend) {
+            try {
+                JSONObject msg = new JSONObject();
+                msg.put("type", "EVAL");
+                msg.put("id", 0);
+                msg.put("code", js);
+                p.postMessage(msg);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void handlePortMessage(JSONObject obj) {
+        String type = obj.optString("type", "");
+        if ("READY".equals(type)) {
+            LOG.d(TAG, "Cordova bridge READY");
+            flushEarlyEvalQueue();
+            return;
+        }
+        if (!"EVAL_RESULT".equals(type)) {
+            return;
+        }
+        int id = obj.optInt("id", -1);
+        ValueCallback<String> cb = evalCallbacks.remove(id);
+        if (cb != null) {
+            cb.onReceiveValue(null);
+        }
     }
 
     private boolean isDebugBuild(Context context) {
@@ -305,6 +449,9 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
         geckoView.setSession(geckoSession);
 
         rebindSessionDelegates();
+
+        // Re-ensure extension + wait for new port (session changes can drop ports)
+        ensureCordovaBridgeExtension();
     }
 
     private void rebindSessionDelegates() {
@@ -340,8 +487,11 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     private GeckoResult<GeckoSession.PromptDelegate.PromptResponse> handleCordovaPrompt(
             GeckoSession.PromptDelegate.TextPrompt prompt) {
 
+        GeckoResult<GeckoSession.PromptDelegate.PromptResponse> result = new GeckoResult<>();
+
         if (bridge == null) {
-            return null;
+            result.complete(prompt.dismiss());
+            return result;
         }
 
         String origin = currentUrl != null ? currentUrl : "";
@@ -350,10 +500,12 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
         String handled = bridge.promptOnJsPrompt(origin, message, defaultValue);
         if (handled == null) {
-            return null;
+            result.complete(prompt.dismiss());
+            return result;
         }
 
-        return GeckoResult.fromValue(prompt.confirm(handled));
+        result.complete(prompt.confirm(handled));
+        return result;
     }
 
     private class EnginePromptDelegate implements GeckoSession.PromptDelegate {
@@ -486,13 +638,8 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return null;
         }
 
-        Uri resourceTarget = uri;
-        if (resourceTarget == null) {
-            return null;
-        }
-
         final String originalUri = request.uri;
-        final Uri finalTarget = resourceTarget;
+        final Uri finalTarget = uri;
         GeckoResult<AllowOrDeny> decision = new GeckoResult<>();
         cordova.getThreadPool().execute(() -> {
             boolean handled = streamLocalResourceToGecko(originalUri, finalTarget);
