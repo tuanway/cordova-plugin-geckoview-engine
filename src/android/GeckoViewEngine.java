@@ -474,12 +474,27 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                                          String url,
                                          List<GeckoSession.PermissionDelegate.ContentPermission> perms,
                                          Boolean hasUserGesture) {
+                currentUrl = url;                
+            }
+        });
+
+        geckoSession.setProgressDelegate(new GeckoSession.ProgressDelegate() {
+            @Override
+            public void onPageStart(GeckoSession session, String url) {
                 currentUrl = url;
                 if (cordovaClient != null) {
-                    cordovaClient.onPageFinishedLoading(url);
+                    cordovaClient.onPageStarted(url);
+                }
+            }
+
+            @Override
+            public void onPageStop(GeckoSession session, boolean success) {
+                if (cordovaClient != null && currentUrl != null) {
+                    cordovaClient.onPageFinishedLoading(currentUrl);
                 }
             }
         });
+
 
         geckoSession.setPromptDelegate(new EnginePromptDelegate());
     }
