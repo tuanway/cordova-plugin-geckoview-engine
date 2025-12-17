@@ -244,6 +244,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     @Override
     public void destroy() {
+        cordovaPort = null;
         if (localServer != null) {
             localServer.stop();
             localServer = null;
@@ -347,11 +348,15 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private void ensureCordovaBridgeExtension() {
-        if (sRuntime == null || geckoSession == null) return;
+        final GeckoSession session = this.geckoSession;  // CAPTURE
+        if (sRuntime == null || session == null) return;
 
         WebExtensionController controller = sRuntime.getWebExtensionController();
         controller.ensureBuiltIn(EXT_URI, EXT_ID).accept(
             ext -> {
+                // If the session changed (recreated) before ensureBuiltIn completed, bail out.
+                if (this.geckoSession != session) return;
+
                 LOG.d(TAG, "Cordova bridge extension ensured: " + ext.id);
 
                 WebExtension.MessageDelegate delegate = new WebExtension.MessageDelegate() {
@@ -363,11 +368,10 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                         port.setDelegate(new WebExtension.PortDelegate() {
                             @Override
                             public void onPortMessage(final Object message, final WebExtension.Port p) {
-                                if (message instanceof org.json.JSONObject) {
-                                    handlePortMessage((org.json.JSONObject) message);
+                                if (message instanceof JSONObject) {
+                                    handlePortMessage((JSONObject) message);
                                 }
                             }
-
                             @Override
                             public void onDisconnect(final WebExtension.Port p) {
                                 if (cordovaPort == p) cordovaPort = null;
@@ -378,13 +382,16 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                     }
                 };
 
-                // Register BOTH places (this is the key)
+                // Register delegate for both background + content-script routing
                 ext.setMessageDelegate(delegate, NATIVE_APP);
-                geckoSession.getWebExtensionController().setMessageDelegate(ext, delegate, NATIVE_APP);
+
+                // IMPORTANT: use the captured session, not this.geckoSession
+                session.getWebExtensionController().setMessageDelegate(ext, delegate, NATIVE_APP);
             },
             e -> LOG.e(TAG, "Failed to ensure Cordova bridge extension", e)
         );
     }
+
 
 
     private void flushEarlyEvalQueue() {
@@ -440,6 +447,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private void recreateSession() {
+        cordovaPort = null;
         if (geckoSession != null) {
             geckoSession.close();
         }
