@@ -3,7 +3,7 @@
 apply plugin: 'com.android.application'
 
 // Allow overriding ABIs/locales via -PGECKO_ABIS="arm64-v8a,armeabi-v7a" etc.
-def geckoAbis = (project.findProperty("GECKO_ABIS") ?: "arm64-v8a")
+def geckoAbis = (project.findProperty("GECKO_ABIS") ?: "arm64-v8a,armeabi-v7a")
         .split(",")
         .collect { it.trim() }
         .findAll { it && !it.equalsIgnoreCase("all") }
@@ -26,7 +26,7 @@ android {
 
     defaultConfig {
 
-        // Only ship the requested ABIs (defaults to arm64 for smallest Gecko build)
+        // Only ship the requested ABIs (defaults to both 32/64-bit ARM builds)
         ndk {
             abiFilters(*geckoAbis)
         }
