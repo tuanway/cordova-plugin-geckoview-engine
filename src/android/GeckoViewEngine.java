@@ -58,7 +58,7 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
 
     // WebExtension bridge constants
     private static final String EXT_ID = "cordova-bridge@example.com";
-    private static final String EXT_URI = "resource://android/assets/cordova_bridge/";
+    private static final String EXT_URI = "resource://android/assets/www/cordova_bridge/";
     private static final String NATIVE_APP = "cordova";
 
     // Cordova state
