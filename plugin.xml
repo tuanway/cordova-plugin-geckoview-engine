@@ -42,10 +42,12 @@
                      target-dir="app/src/main/java/com/cordova/geckoview" />
 
         <!-- Built-in WebExtension assets (Cordova bridge) -->
-        <source-file src="src/android/webext/cordova_bridge/manifest.json"
-                       target-dir="app/src/main/assets/www/cordova_bridge" />
-        <source-file src="src/android/webext/cordova_bridge/content.js"
-                       target-dir="app/src/main/assets/www/cordova_bridge" />
+        <!-- WebExtension files as Cordova web assets (always copied) -->
+        <asset src="src/android/webext/cordova_bridge/manifest.json"
+           target="cordova_bridge/manifest.json" />
+        <asset src="src/android/webext/cordova_bridge/content.js"
+           target="cordova_bridge/content.js" />
+
 
 
     </platform>
