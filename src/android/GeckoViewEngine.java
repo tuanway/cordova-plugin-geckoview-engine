@@ -347,45 +347,45 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
     }
 
     private void ensureCordovaBridgeExtension() {
-        if (sRuntime == null) return;
+        if (sRuntime == null || geckoSession == null) return;
 
         WebExtensionController controller = sRuntime.getWebExtensionController();
         controller.ensureBuiltIn(EXT_URI, EXT_ID).accept(
-                ext -> {
-                    LOG.d(TAG, "Cordova bridge extension ensured: " + ext.id);
+            ext -> {
+                LOG.d(TAG, "Cordova bridge extension ensured: " + ext.id);
 
-                    // Set delegate for the nativeApp id ("cordova")
-                    ext.setMessageDelegate(new WebExtension.MessageDelegate() {
-                        @Override
-                        public void onConnect(final WebExtension.Port port) {
-                            LOG.d(TAG, "Cordova bridge port connected");
-                            cordovaPort = port;
-                            port.setDelegate(new WebExtension.PortDelegate() {
-                                @Override
-                                public void onPortMessage(final Object message, final WebExtension.Port p) {
-                                    if (message instanceof JSONObject) {
-                                        handlePortMessage((JSONObject) message);
-                                    } else {
-                                        LOG.d(TAG, "Port message: " + String.valueOf(message));
-                                    }
+                WebExtension.MessageDelegate delegate = new WebExtension.MessageDelegate() {
+                    @Override
+                    public void onConnect(final WebExtension.Port port) {
+                        LOG.d(TAG, "Cordova bridge port connected");
+                        cordovaPort = port;
+
+                        port.setDelegate(new WebExtension.PortDelegate() {
+                            @Override
+                            public void onPortMessage(final Object message, final WebExtension.Port p) {
+                                if (message instanceof org.json.JSONObject) {
+                                    handlePortMessage((org.json.JSONObject) message);
                                 }
+                            }
 
-                                @Override
-                                public void onDisconnect(final WebExtension.Port p) {
-                                    if (cordovaPort == p) {
-                                        cordovaPort = null;
-                                    }
-                                }
-                            });
+                            @Override
+                            public void onDisconnect(final WebExtension.Port p) {
+                                if (cordovaPort == p) cordovaPort = null;
+                            }
+                        });
 
-                            // Flush early queued JS now that the port is available.
-                            flushEarlyEvalQueue();
-                        }
-                    }, NATIVE_APP);
-                },
-                e -> LOG.e(TAG, "Failed to ensure Cordova bridge extension", e)
+                        flushEarlyEvalQueue();
+                    }
+                };
+
+                // Register BOTH places (this is the key)
+                ext.setMessageDelegate(delegate, NATIVE_APP);
+                geckoSession.getWebExtensionController().setMessageDelegate(ext, delegate, NATIVE_APP);
+            },
+            e -> LOG.e(TAG, "Failed to ensure Cordova bridge extension", e)
         );
     }
+
 
     private void flushEarlyEvalQueue() {
         WebExtension.Port p = cordovaPort;
