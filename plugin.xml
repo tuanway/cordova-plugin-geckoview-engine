@@ -43,9 +43,9 @@
 
         <!-- Built-in WebExtension assets (Cordova bridge) -->
         <resource-file src="src/android/webext/cordova_bridge/manifest.json"
-               target="app/src/main/assets/www/cordova_bridge/manifest.json" />
+               target-dir="app/src/main/assets/www/cordova_bridge" />
         <resource-file src="src/android/webext/cordova_bridge/content.js"
-               target="app/src/main/assets/www/cordova_bridge/content.js" />
+               target-dir="app/src/main/assets/www/cordova_bridge" />
 
 
     </platform>
