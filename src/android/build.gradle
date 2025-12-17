@@ -8,7 +8,7 @@ def geckoAbis = (project.findProperty("GECKO_ABIS") ?: "arm64-v8a")
         .collect { it.trim() }
         .findAll { it && !it.equalsIgnoreCase("all") }
 if (geckoAbis.isEmpty()) {
-    geckoAbis = ["arm64-v8a"]
+    geckoAbis = ["arm64-v8a","armeabi-v7a"]
 }
 def resPref = project.findProperty("GECKO_RES_CONFIGS") ?: "en"
 def keepAllLocales = resPref.equalsIgnoreCase("all")
