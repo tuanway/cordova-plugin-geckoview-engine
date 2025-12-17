@@ -35,20 +35,11 @@
 
         <!-- Engine Java source -->
         <source-file src="src/android/GeckoViewEngine.java"
-                     target-dir="app/src/main/java/com/cordova/geckoview" />
+                     target-dir="src/com/cordova/geckoview" />
         <source-file src="src/android/LocalHttpServer.java"
-                     target-dir="app/src/main/java/com/cordova/geckoview" />
+                     target-dir="src/com/cordova/geckoview" />
         <source-file src="src/android/MimeTypeHelper.java"
-                     target-dir="app/src/main/java/com/cordova/geckoview" />
-
-        <!-- Built-in WebExtension assets (Cordova bridge) -->
-        <!-- WebExtension files as Cordova web assets (always copied) -->
-        <asset src="src/android/webext/cordova_bridge/manifest.json"
-           target="cordova_bridge/manifest.json" />
-        <asset src="src/android/webext/cordova_bridge/content.js"
-           target="cordova_bridge/content.js" />
-
-
+                     target-dir="src/com/cordova/geckoview" />
 
     </platform>
 
