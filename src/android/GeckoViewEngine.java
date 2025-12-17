@@ -482,18 +482,32 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             @Override
             public void onPageStart(GeckoSession session, String url) {
                 currentUrl = url;
-                if (cordovaClient != null) {
-                    cordovaClient.onPageStarted(url);
-                }
+
+                Runnable r = () -> {
+                    if (cordovaClient != null) {
+                        cordovaClient.onPageStarted(url);
+                    }
+                };
+
+                Activity a = (cordova != null) ? cordova.getActivity() : null;
+                if (a != null) a.runOnUiThread(r); else r.run();
             }
 
             @Override
             public void onPageStop(GeckoSession session, boolean success) {
-                if (cordovaClient != null && currentUrl != null) {
-                    cordovaClient.onPageFinishedLoading(currentUrl);
-                }
+                final String finishedUrl = currentUrl;
+
+                Runnable r = () -> {
+                    if (cordovaClient != null && finishedUrl != null) {
+                        cordovaClient.onPageFinishedLoading(finishedUrl);
+                    }
+                };
+
+                Activity a = (cordova != null) ? cordova.getActivity() : null;
+                if (a != null) a.runOnUiThread(r); else r.run();
             }
-        });
+});
+
 
 
         geckoSession.setPromptDelegate(new EnginePromptDelegate());
