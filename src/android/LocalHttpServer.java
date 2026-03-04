@@ -270,7 +270,7 @@ class LocalHttpServer {
             sendStatus(out, "404 Not Found", "Not Found");
             return;
         }
-        CordovaResourceApi.OpenForReadResult result;
+        CordovaResourceApi.OpenForReadResult result = null;
         Uri servingUri = target;
         try {
             Uri remapped = resourceApi.remapUri(target);
@@ -309,6 +309,12 @@ class LocalHttpServer {
         } catch (IOException e) {
             LOG.e(TAG, "Failed serving " + target, e);
             sendStatus(out, "500 Internal Server Error", "Error");
+            return;
+        }
+
+        if (result == null) {
+            LOG.e(TAG, "No open result for " + rawPath);
+            sendStatus(out, "404 Not Found", "Not Found");
             return;
         }
 
