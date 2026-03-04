@@ -276,6 +276,20 @@ class LocalHttpServer {
             Uri remapped = resourceApi.remapUri(target);
             result = resourceApi.openForRead(remapped != null ? remapped : target);
         } catch (FileNotFoundException e) {
+            Uri bundledFallback = resolveBundledFallback(rawPath, target);
+            if (bundledFallback != null) {
+                try {
+                    Uri remappedFallbackAsset = resourceApi.remapUri(bundledFallback);
+                    result = resourceApi.openForRead(remappedFallbackAsset != null ? remappedFallbackAsset : bundledFallback);
+                    servingUri = bundledFallback;
+                    LOG.d(TAG, "Served bundled fallback " + bundledFallback + " for " + rawPath);
+                } catch (IOException ignoredFallbackErr) {
+                    // continue with existing index fallback handling below
+                }
+            }
+            if (servingUri != null && !servingUri.equals(target)) {
+                // bundled fallback succeeded
+            } else
             if (!TextUtils.isEmpty(defaultRelativePath) && (TextUtils.isEmpty(target.getLastPathSegment()) || "index.html".equals(target.getLastPathSegment()))) {
                 Uri fallback = Uri.parse(appBase + defaultRelativePath);
                 servingUri = fallback;
@@ -326,6 +340,40 @@ class LocalHttpServer {
             }
         }
         out.flush();
+    }
+
+    private Uri resolveBundledFallback(String rawPath, Uri target) {
+        if (TextUtils.isEmpty(rawPath) || target == null) {
+            return null;
+        }
+        String effectiveBase = getEffectiveBase();
+        if (TextUtils.isEmpty(effectiveBase) || TextUtils.equals(normalizeBase(effectiveBase), normalizeBase(appBase))) {
+            return null;
+        }
+
+        String path = rawPath;
+        int query = path.indexOf('?');
+        if (query >= 0) {
+            path = path.substring(0, query);
+        }
+        if (path.startsWith(CDV_PREFIX)) {
+            return null;
+        }
+        String relative;
+        if (path.startsWith(APP_PREFIX)) {
+            relative = path.substring(APP_PREFIX.length());
+        } else {
+            relative = path;
+        }
+        if (TextUtils.isEmpty(relative) || "/".equals(relative)) {
+            relative = defaultRelativePath;
+        } else if (relative.startsWith("/")) {
+            relative = relative.substring(1);
+        }
+        if (TextUtils.isEmpty(relative)) {
+            return null;
+        }
+        return Uri.parse(appBase + relative);
     }
 
     Uri resolveAppUri(String path) {
