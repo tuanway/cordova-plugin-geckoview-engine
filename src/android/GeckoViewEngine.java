@@ -482,6 +482,29 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
             return null;
         }
 
+        // Gecko can treat Loader.data HTML navigations as data-doc context on some builds,
+        // which breaks relative script URLs. Route local HTML navigations through the
+        // embedded localhost server instead.
+        if ((isCordovaScheme || isFileScheme) && shouldRerouteToLocalServer(request.uri)) {
+            final String rewritten = localServer != null ? localServer.rewriteUri(request.uri) : request.uri;
+            if (!TextUtils.isEmpty(rewritten) && !TextUtils.equals(rewritten, request.uri)) {
+                Activity activity = cordova.getActivity();
+                Runnable rerouteTask = () -> {
+                    if (geckoSession == null) {
+                        return;
+                    }
+                    currentUrl = rewritten;
+                    geckoSession.loadUri(rewritten);
+                };
+                if (activity != null) {
+                    activity.runOnUiThread(rerouteTask);
+                } else {
+                    rerouteTask.run();
+                }
+                return GeckoResult.fromValue(AllowOrDeny.DENY);
+            }
+        }
+
         if (!isCordovaScheme && !isFileScheme) {
             return null;
         }
@@ -501,6 +524,26 @@ public class GeckoViewEngine implements CordovaWebViewEngine {
                     : AllowOrDeny.ALLOW);
         });
         return decision;
+    }
+
+    private boolean shouldRerouteToLocalServer(String uriText) {
+        if (TextUtils.isEmpty(uriText) || localServer == null) {
+            return false;
+        }
+        String u = uriText.toLowerCase();
+        if (u.startsWith("javascript:")) {
+            return false;
+        }
+        if (u.contains(".html") || u.endsWith("/") || u.endsWith(".htm")) {
+            return true;
+        }
+        // Handle root file/cdvfile navigations that may omit extension.
+        if (u.startsWith("file://") || u.startsWith("cdvfile://")) {
+            int q = u.indexOf('?');
+            String noQuery = q >= 0 ? u.substring(0, q) : u;
+            return noQuery.endsWith("/www") || noQuery.endsWith("/www/") || noQuery.endsWith("/tienlen");
+        }
+        return false;
     }
 
     private boolean isLocalLoopback(Uri uri) {
